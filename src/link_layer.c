@@ -1,6 +1,7 @@
 // Link layer protocol implementation
 
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,13 @@
 
 int fd = 0;
 struct termios oldtermios;
+
+int n_retransmissions;
+int timeout;
+int n_retransmissions_sent;
+
+unsigned char *last_frame;
+size_t last_frame_size;
 
 unsigned char make_BCC(unsigned char addr, unsigned char cmd) {
     return (unsigned char)(addr ^ cmd);
@@ -56,22 +64,46 @@ unsigned char *create_S_frame(unsigned char addr, unsigned char cmd) {
     return frame;
 }
 
-size_t send_frame(unsigned char *frame, size_t frame_len) {
-    return write(fd, frame, frame_len);
+size_t send_frame(unsigned char *frame, size_t frame_len, int retry) {
+    write(fd, frame, frame_len);
+
+    if (retry) {
+        last_frame = reallocarray(last_frame, frame_len, sizeof(unsigned char));
+        memcpy(last_frame, frame, frame_len * sizeof(unsigned char));
+        last_frame_size = frame_len;
+        n_retransmissions_sent = 0;
+        alarm(timeout);
+    }
 }
 
-void send_S_frame(unsigned char addr, unsigned char cmd) {
+void send_S_frame(unsigned char addr, unsigned char cmd, int retry) {
     unsigned char *set_frame = create_S_frame(addr, cmd);
 
-    send_frame(set_frame, S_FRAME_LEN);
+    send_frame(set_frame, S_FRAME_LEN, retry);
 
     free(set_frame);
+}
+
+void alarm_handler(int signal) {
+    if (n_retransmissions_sent == n_retransmissions)
+        exit(-1);
+
+    printf("Acknowledgement not received, retrying\n");
+
+    send_frame(last_frame, last_frame_size, FALSE);
+    alarm(timeout);
+    n_retransmissions_sent++;
 }
 
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters) {
+    n_retransmissions = connectionParameters.nRetransmissions;
+    n_retransmissions_sent = 0;
+    timeout = connectionParameters.timeout;
+
+    signal(SIGALRM, alarm_handler);
 
     fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
 
@@ -100,11 +132,12 @@ int llopen(LinkLayer connectionParameters) {
     }
 
     if (connectionParameters.role == LlTx) {
-        send_S_frame(TX_ADDR, SET);
+        send_S_frame(TX_ADDR, SET, TRUE);
         read_S_frame(TX_ADDR, UA);
+        alarm(0);
     } else {
         read_S_frame(TX_ADDR, SET);
-        send_S_frame(TX_ADDR, UA);
+        send_S_frame(TX_ADDR, UA, FALSE);
     }
 
     return 0;
