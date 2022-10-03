@@ -31,16 +31,22 @@ typedef struct {
 #define S_FRAME_LEN 5
 
 #define FLAG (unsigned char)0x7e
+#define ESC (unsigned char)0x7d
+
+#define ESC_FLAG (unsigned char)0x5e
+#define ESC_ESC (unsigned char)0x5d
 
 #define RX_ADDR (unsigned char)0x03
 #define TX_ADDR (unsigned char)0x07
 
 #define UA (unsigned char)0x07
 #define SET (unsigned char)0x03
-#define DISC (unsigned char)0x0B
+#define DISC (unsigned char)0x0b
 #define I(s) (unsigned char)BIT_B(s, 6)
 #define ACK(r) (unsigned char)(BIT_B(r, 7) | 0b101)
 #define NACK(r) (unsigned char)(BIT_B(r, 7) | 0b001)
+
+#define I_ERR 0x0f
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
