@@ -1,3 +1,4 @@
 bin/
 penguin-received.gif
 *.o
+*.swp
