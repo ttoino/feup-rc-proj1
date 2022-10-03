@@ -64,8 +64,8 @@ unsigned char *create_S_frame(unsigned char addr, unsigned char cmd) {
     return frame;
 }
 
-size_t send_frame(unsigned char *frame, size_t frame_len, int retry) {
-    write(fd, frame, frame_len);
+ssize_t send_frame(unsigned char *frame, size_t frame_len, int retry) {
+    ssize_t bytes_written = write(fd, frame, frame_len);
 
     if (retry) {
         last_frame = reallocarray(last_frame, frame_len, sizeof(unsigned char));
@@ -74,6 +74,8 @@ size_t send_frame(unsigned char *frame, size_t frame_len, int retry) {
         n_retransmissions_sent = 0;
         alarm(timeout);
     }
+
+    return bytes_written;
 }
 
 void send_S_frame(unsigned char addr, unsigned char cmd, int retry) {
@@ -95,21 +97,28 @@ void alarm_handler(int signal) {
     n_retransmissions_sent++;
 }
 
-////////////////////////////////////////////////
-// LLOPEN
-////////////////////////////////////////////////
-int llopen(LinkLayer connectionParameters) {
-    n_retransmissions = connectionParameters.nRetransmissions;
-    n_retransmissions_sent = 0;
-    timeout = connectionParameters.timeout;
+void handshake(LinkLayerRole role) {
+   if (role == LlTx) {
+        send_S_frame(TX_ADDR, SET, TRUE);
+        read_S_frame(TX_ADDR, UA);
+        alarm(0);
+    } else {
+        read_S_frame(TX_ADDR, SET);
+        send_S_frame(TX_ADDR, UA, FALSE);
+    }
+}
 
+void setupTimeoutHandler() {
     signal(SIGALRM, alarm_handler);
+}
 
-    fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
+int setupSerialConnection(char* serialPort, int v_min, int v_time) {
+
+    fd = open(serialPort, O_RDWR | O_NOCTTY);
 
     if (tcgetattr(fd, &oldtermios) == -1) {
         perror("llopen");
-        exit(-1);
+        return -1;
     }
 
     struct termios newtermios;
@@ -121,26 +130,36 @@ int llopen(LinkLayer connectionParameters) {
     newtermios.c_oflag = 0;
 
     newtermios.c_lflag = 0;
-    newtermios.c_cc[VTIME] = 0;
-    newtermios.c_cc[VMIN] = 1;
+    newtermios.c_cc[VTIME] = v_time;
+    newtermios.c_cc[VMIN] = v_min;
 
     tcflush(fd, TCIOFLUSH);
 
     if (tcsetattr(fd, TCSANOW, &newtermios) == -1) {
         perror("llopen");
-        exit(-1);
+        return -1;
     }
 
-    if (connectionParameters.role == LlTx) {
-        send_S_frame(TX_ADDR, SET, TRUE);
-        read_S_frame(TX_ADDR, UA);
-        alarm(0);
-    } else {
-        read_S_frame(TX_ADDR, SET);
-        send_S_frame(TX_ADDR, UA, FALSE);
+    return 1;
+}
+
+////////////////////////////////////////////////
+// LLOPEN
+////////////////////////////////////////////////
+int llopen(LinkLayer connectionParameters) {
+    n_retransmissions = connectionParameters.nRetransmissions;
+    n_retransmissions_sent = 0;
+    timeout = connectionParameters.timeout;
+
+    setupTimeoutHandler();
+
+    if(setupSerialConnection(connectionParameters.serialPort, 1, 0) == -1) {
+	exit(-1);
     }
 
-    return 0;
+    handshake(connectionParameters.role);
+
+    return 1;
 }
 
 ////////////////////////////////////////////////
