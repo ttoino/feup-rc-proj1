@@ -30,6 +30,7 @@ unsigned char make_BCC(unsigned char addr, unsigned char cmd) {
 }
 
 void read_S_frame(unsigned char addr, unsigned char cmd) {
+
 #define READ_S_FRAME_BYTE(EXPECTED)                                            \
     read(fd, &byte, 1);                                                        \
     if (byte != EXPECTED) {                                                    \
@@ -90,7 +91,7 @@ void alarm_handler(int signal) {
     if (n_retransmissions_sent == n_retransmissions)
         exit(-1);
 
-    printf("Acknowledgement not received, retrying\n");
+    puts("Acknowledgement not received, retrying");
 
     send_frame(last_frame, last_frame_size, FALSE);
     alarm(timeout);
