@@ -1,6 +1,8 @@
 // Application layer protocol implementation
 
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "application_layer.h"
 #include "link_layer.h"
@@ -23,6 +25,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     llopen(ll);
 
+    if (ll.role == LlRx) {
+        unsigned char* s = NULL;
+        while (llread(s) != -1)
+	    printf("\"%s\"\n", s);
+        free(s);
+    }    
 
     llclose(FALSE);
 }

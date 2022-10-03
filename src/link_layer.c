@@ -1,5 +1,7 @@
 // Link layer protocol implementation
 
+#define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -29,27 +31,61 @@ unsigned char make_BCC(unsigned char addr, unsigned char cmd) {
     return (unsigned char)(addr ^ cmd);
 }
 
-void read_S_frame(unsigned char addr, unsigned char cmd) {
-
-#define READ_S_FRAME_BYTE(EXPECTED)                                            \
-    read(fd, &byte, 1);                                                        \
-    if (byte != EXPECTED) {                                                    \
-        if (byte == FLAG)                                                      \
+unsigned char *read_frame(unsigned char addr, unsigned char cmd) {
+#define READ_FRAME_HEADER(EXPECTED)                                            \
+    read(fd, frame + i, 1);                                                    \
+    if (frame[i++] != (EXPECTED)) {                                            \
+        if (frame[i-1] == FLAG)                                                \
             goto flag_rcv;                                                     \
         else                                                                   \
             goto start;                                                        \
     }
 
-    unsigned char byte;
+    unsigned char* frame = calloc(S_FRAME_LEN, sizeof(unsigned char));
+    size_t i = 0;
 
 start:
-    READ_S_FRAME_BYTE(FLAG);
+    i = 0;
+    READ_FRAME_HEADER(FLAG);
 
 flag_rcv:
-    READ_S_FRAME_BYTE(addr);
-    READ_S_FRAME_BYTE(cmd);
-    READ_S_FRAME_BYTE(make_BCC(addr, cmd));
-    READ_S_FRAME_BYTE(FLAG);
+    i = 1;
+    READ_FRAME_HEADER(addr);
+    READ_FRAME_HEADER(cmd);
+    READ_FRAME_HEADER(make_BCC(addr, cmd));
+
+    if (frame[2] & 0xF == I(0))
+        while (TRUE) {
+            frame = reallocarray(frame, i + 1, sizeof(unsigned char));
+	    read(fd, frame + i, 1);
+
+	    if (frame[i] == ESC) {
+		unsigned char temp;
+                read(fd, &temp, 1);
+		if (temp == ESC_FLAG) {
+		    frame[i] = FLAG;
+		} else if (temp == ESC_ESC) {
+		    frame[i] = ESC;
+		} else {
+		    frame[2] |= I_ERR;
+                    break;
+		}
+	    } else if (frame[i] == FLAG) {
+		unsigned char bcc2 = 0;
+
+		for (size_t j = 4; j <= i - 2; ++j)
+		    bcc2 ^= frame[j];
+
+		if (bcc2 != frame[i - 1])
+		    frame[2] |= I_ERR;
+
+		break;
+	    }
+        }
+    else
+        READ_FRAME_HEADER(FLAG);
+
+    return frame;
 }
 
 unsigned char *create_S_frame(unsigned char addr, unsigned char cmd) {
@@ -101,10 +137,10 @@ void alarm_handler(int signal) {
 void handshake(LinkLayerRole role) {
    if (role == LlTx) {
         send_S_frame(TX_ADDR, SET, TRUE);
-        read_S_frame(TX_ADDR, UA);
+        free(read_frame(TX_ADDR, UA));
         alarm(0);
     } else {
-        read_S_frame(TX_ADDR, SET);
+        free(read_frame(TX_ADDR, SET));
         send_S_frame(TX_ADDR, UA, FALSE);
     }
 }
@@ -178,7 +214,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
 int llread(unsigned char *packet) {
     // TODO
 
-    return 0;
+    return -1;
 }
 
 ////////////////////////////////////////////////
