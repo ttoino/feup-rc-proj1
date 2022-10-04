@@ -24,24 +24,25 @@ int n_retransmissions;
 int timeout;
 int n_retransmissions_sent;
 
-unsigned char *last_frame;
-size_t last_frame_size;
+unsigned char *last_frame = NULL;
+size_t last_frame_size = 0;
 
 unsigned char make_BCC(unsigned char addr, unsigned char cmd) {
     return (unsigned char)(addr ^ cmd);
 }
 
 unsigned char *read_frame(unsigned char addr, unsigned char cmd) {
+    // AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA this will change
 #define READ_FRAME_HEADER(EXPECTED)                                            \
     read(fd, frame + i, 1);                                                    \
     if (frame[i++] != (EXPECTED)) {                                            \
-        if (frame[i-1] == FLAG)                                                \
+        if (frame[i - 1] == FLAG)                                              \
             goto flag_rcv;                                                     \
         else                                                                   \
             goto start;                                                        \
     }
 
-    unsigned char* frame = calloc(S_FRAME_LEN, sizeof(unsigned char));
+    unsigned char *frame = calloc(S_FRAME_LEN, sizeof(unsigned char));
     size_t i = 0;
 
 start:
@@ -57,30 +58,30 @@ flag_rcv:
     if (frame[2] & 0xF == I(0))
         while (TRUE) {
             frame = reallocarray(frame, i + 1, sizeof(unsigned char));
-	    read(fd, frame + i, 1);
+            read(fd, frame + i, 1);
 
-	    if (frame[i] == ESC) {
-		unsigned char temp;
+            if (frame[i] == ESC) {
+                unsigned char temp;
                 read(fd, &temp, 1);
-		if (temp == ESC_FLAG) {
-		    frame[i] = FLAG;
-		} else if (temp == ESC_ESC) {
-		    frame[i] = ESC;
-		} else {
-		    frame[2] |= I_ERR;
+                if (temp == ESC_FLAG) {
+                    frame[i] = FLAG;
+                } else if (temp == ESC_ESC) {
+                    frame[i] = ESC;
+                } else {
+                    frame[2] |= I_ERR;
                     break;
-		}
-	    } else if (frame[i] == FLAG) {
-		unsigned char bcc2 = 0;
+                }
+            } else if (frame[i] == FLAG) {
+                unsigned char bcc2 = 0;
 
-		for (size_t j = 4; j <= i - 2; ++j)
-		    bcc2 ^= frame[j];
+                for (size_t j = 4; j <= i - 2; ++j)
+                    bcc2 ^= frame[j];
 
-		if (bcc2 != frame[i - 1])
-		    frame[2] |= I_ERR;
+                if (bcc2 != frame[i - 1])
+                    frame[2] |= I_ERR;
 
-		break;
-	    }
+                break;
+            }
         }
     else
         READ_FRAME_HEADER(FLAG);
@@ -116,11 +117,11 @@ ssize_t send_frame(unsigned char *frame, size_t frame_len, int retry) {
 }
 
 void send_S_frame(unsigned char addr, unsigned char cmd, int retry) {
-    unsigned char *set_frame = create_S_frame(addr, cmd);
+    unsigned char *s_frame = create_S_frame(addr, cmd);
 
-    send_frame(set_frame, S_FRAME_LEN, retry);
+    send_frame(s_frame, S_FRAME_LEN, retry);
 
-    free(set_frame);
+    free(s_frame);
 }
 
 void alarm_handler(int signal) {
@@ -135,7 +136,7 @@ void alarm_handler(int signal) {
 }
 
 void handshake(LinkLayerRole role) {
-   if (role == LlTx) {
+    if (role == LlTx) {
         send_S_frame(TX_ADDR, SET, TRUE);
         free(read_frame(TX_ADDR, UA));
         alarm(0);
@@ -145,11 +146,9 @@ void handshake(LinkLayerRole role) {
     }
 }
 
-void setupTimeoutHandler() {
-    signal(SIGALRM, alarm_handler);
-}
+void setupTimeoutHandler() { signal(SIGALRM, alarm_handler); }
 
-int setupSerialConnection(char* serialPort, int v_min, int v_time) {
+int setupSerialConnection(char *serialPort, int v_min, int v_time) {
 
     fd = open(serialPort, O_RDWR | O_NOCTTY);
 
@@ -190,8 +189,8 @@ int llopen(LinkLayer connectionParameters) {
 
     setupTimeoutHandler();
 
-    if(setupSerialConnection(connectionParameters.serialPort, 1, 0) == -1) {
-	exit(-1);
+    if (setupSerialConnection(connectionParameters.serialPort, 1, 0) == -1) {
+        exit(-1);
     }
 
     handshake(connectionParameters.role);
@@ -205,7 +204,7 @@ int llopen(LinkLayer connectionParameters) {
 int llwrite(const unsigned char *buf, int bufSize) {
     // TODO
 
-    return 0;
+    return -1;
 }
 
 ////////////////////////////////////////////////
@@ -227,6 +226,9 @@ int llclose(int showStatistics) {
     }
 
     close(fd);
+
+    free(last_frame);
+    last_frame_size = 0;
 
     return 1;
 }

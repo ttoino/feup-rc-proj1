@@ -14,10 +14,8 @@
 //   $1: /dev/ttySxx
 //   $2: tx | rx
 //   $3: filename
-int main(int argc, char *argv[])
-{
-    if (argc < 4)
-    {
+int main(int argc, char *argv[]) {
+    if (argc < 4) {
         printf("Usage: %s /dev/ttySxx tx|rx filename\n", argv[0]);
         exit(1);
     }
@@ -33,12 +31,7 @@ int main(int argc, char *argv[])
            "  - Number of tries: %d\n"
            "  - Timeout: %d\n"
            "  - Filename: %s\n",
-           serialPort,
-           role,
-           BAUDRATE,
-           N_TRIES,
-           TIMEOUT,
-           filename);
+           serialPort, role, BAUDRATE, N_TRIES, TIMEOUT, filename);
 
     applicationLayer(serialPort, role, BAUDRATE, N_TRIES, TIMEOUT, filename);
 
