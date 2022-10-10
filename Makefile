@@ -10,8 +10,8 @@ INCLUDE = include/
 BIN = bin/
 CABLE_DIR = cable/
 
-TX_SERIAL_PORT = /dev/ttyS0
-RX_SERIAL_PORT = /dev/ttyS0
+TX_SERIAL_PORT = /dev/ttyS10
+RX_SERIAL_PORT = /dev/ttyS11
 
 TX_FILE = penguin.gif
 RX_FILE = penguin-received.gif
@@ -20,7 +20,7 @@ RX_FILE = penguin-received.gif
 .PHONY: all
 all: $(BIN)/main $(BIN)/cable
 
-$(BIN)/main: main.c $(SRC)/*.c
+$(BIN)/main: main.c $(SRC)/**/*.c $(SRC)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE)
 
 $(BIN)/cable: $(CABLE_DIR)/cable.c
