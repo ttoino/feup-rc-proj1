@@ -75,7 +75,7 @@ size_t read_frame(int fd, unsigned char *frame, unsigned char addr) {
 
             break;
 
-        case ESC_RCV:
+        case ESC_RCV: {
             unsigned char temp;
             read(fd, &temp, 1);
             state = DATA_RCV;
@@ -88,13 +88,13 @@ size_t read_frame(int fd, unsigned char *frame, unsigned char addr) {
                 state = NACK;
 
             break;
-
+	}
         case NACK:
             frame[2] |= I_ERR;
             state = END;
             break;
 
-        case END_FLAG_RCV:
+        case END_FLAG_RCV: {
             unsigned char bcc2 = 0;
 
             for (size_t j = 4; j <= i - 2; ++j)
@@ -105,7 +105,8 @@ size_t read_frame(int fd, unsigned char *frame, unsigned char addr) {
             else
                 state = END;
             break;
-        default:
+	}
+	default:
             return i + 1;
         }
     }

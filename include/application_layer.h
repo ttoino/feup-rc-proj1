@@ -4,6 +4,17 @@
 #ifndef _APPLICATION_LAYER_H_
 #define _APPLICATION_LAYER_H_
 
+enum packet_type {
+    DATA = 1,
+    START,
+    END
+};
+
+enum control_packet_field_type {
+    FILE_SIZE,
+    FILE_NAME
+};
+
 // Application layer main function.
 // Arguments:
 //   serialPort: Serial port name (e.g., /dev/ttyS0).

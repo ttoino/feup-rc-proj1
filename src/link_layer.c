@@ -87,10 +87,11 @@ void handle_frame(unsigned char *frame, size_t length) {
         send_S_frame(TX_ADDR, UA, FALSE);
         break;
     case I(0):
-    case I(1):
+    case I(1): {
         unsigned char s = frame[2] >> 6;
         send_S_frame(TX_ADDR, ACK((s + 1) % 2), FALSE);
         break;
+    }
     case UA:
     case ACK(0):
     case ACK(1):
@@ -155,7 +156,7 @@ int llopen(LinkLayer connectionParameters) {
     setupTimeoutHandler();
 
     if (setupSerialConnection(connectionParameters.serialPort, 1, 0) == -1) {
-        exit(-1);
+	return -1 ;
     }
 
     handshake(connectionParameters.role);
