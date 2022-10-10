@@ -13,6 +13,8 @@
 #include <unistd.h>
 
 #include "link_layer.h"
+#include "link_layer/common.h"
+#include "link_layer/read_frame.h"
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -27,67 +29,7 @@ int n_retransmissions_sent;
 unsigned char *last_frame = NULL;
 size_t last_frame_size = 0;
 
-unsigned char make_BCC(unsigned char addr, unsigned char cmd) {
-    return (unsigned char)(addr ^ cmd);
-}
-
-unsigned char *read_frame(unsigned char addr, unsigned char cmd) {
-    // AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA this will change
-#define READ_FRAME_HEADER(EXPECTED)                                            \
-    read(fd, frame + i, 1);                                                    \
-    if (frame[i++] != (EXPECTED)) {                                            \
-        if (frame[i - 1] == FLAG)                                              \
-            goto flag_rcv;                                                     \
-        else                                                                   \
-            goto start;                                                        \
-    }
-
-    unsigned char *frame = calloc(S_FRAME_LEN, sizeof(unsigned char));
-    size_t i = 0;
-
-start:
-    i = 0;
-    READ_FRAME_HEADER(FLAG);
-
-flag_rcv:
-    i = 1;
-    READ_FRAME_HEADER(addr);
-    READ_FRAME_HEADER(cmd);
-    READ_FRAME_HEADER(make_BCC(addr, cmd));
-
-    if (frame[2] & 0xF == I(0))
-        while (TRUE) {
-            frame = reallocarray(frame, i + 1, sizeof(unsigned char));
-            read(fd, frame + i, 1);
-
-            if (frame[i] == ESC) {
-                unsigned char temp;
-                read(fd, &temp, 1);
-                if (temp == ESC_FLAG) {
-                    frame[i] = FLAG;
-                } else if (temp == ESC_ESC) {
-                    frame[i] = ESC;
-                } else {
-                    frame[2] |= I_ERR;
-                    break;
-                }
-            } else if (frame[i] == FLAG) {
-                unsigned char bcc2 = 0;
-
-                for (size_t j = 4; j <= i - 2; ++j)
-                    bcc2 ^= frame[j];
-
-                if (bcc2 != frame[i - 1])
-                    frame[2] |= I_ERR;
-
-                break;
-            }
-        }
-    else
-        READ_FRAME_HEADER(FLAG);
-
-    return frame;
-}
+unsigned char frame[1024];
 
 unsigned char *create_S_frame(unsigned char addr, unsigned char cmd) {
 
@@ -135,15 +77,38 @@ void alarm_handler(int signal) {
     n_retransmissions_sent++;
 }
 
-void handshake(LinkLayerRole role) {
-    if (role == LlTx) {
-        send_S_frame(TX_ADDR, SET, TRUE);
-        free(read_frame(TX_ADDR, UA));
-        alarm(0);
-    } else {
-        free(read_frame(TX_ADDR, SET));
+void handle_frame(unsigned char *frame, size_t length) {
+    if (length < S_FRAME_LEN)
+        return;
+
+    switch (frame[2]) {
+    case SET:
+    case DISC:
         send_S_frame(TX_ADDR, UA, FALSE);
+        break;
+    case I(0):
+    case I(1):
+        unsigned char s = frame[2] >> 6;
+        send_S_frame(TX_ADDR, ACK((s + 1) % 2), FALSE);
+        break;
+    case UA:
+    case ACK(0):
+    case ACK(1):
+        alarm(0);
+        break;
+    case NACK(0):
+    case NACK(1):
+        alarm_handler(0);
+        break;
     }
+}
+
+void handshake(LinkLayerRole role) {
+    if (role == LlTx)
+        send_S_frame(TX_ADDR, SET, TRUE);
+
+    size_t len = read_frame(fd, frame, TX_ADDR);
+    handle_frame(frame, len);
 }
 
 void setupTimeoutHandler() { signal(SIGALRM, alarm_handler); }
