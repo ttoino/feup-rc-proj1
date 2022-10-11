@@ -22,6 +22,9 @@
 int fd = 0;
 struct termios oldtermios;
 
+int tx_sequence_nr = 0;
+int rx_sequence_nr = 0;
+
 int n_retransmissions;
 int timeout;
 int n_retransmissions_sent;
@@ -70,16 +73,19 @@ void alarm_handler(int signal) {
     if (n_retransmissions_sent == n_retransmissions)
         exit(-1);
 
-    puts("Acknowledgement not received, retrying");
+    printf("Acknowledgement not received, retrying (c = %02x)\n",
+           last_frame[2]);
 
     send_frame(last_frame, last_frame_size, FALSE);
     alarm(timeout);
     n_retransmissions_sent++;
 }
 
-void handle_frame(unsigned char *frame, size_t length) {
+unsigned char handle_frame(unsigned char *frame, size_t length) {
     if (length < S_FRAME_LEN)
-        return;
+        return -1;
+
+    printf("Received frame (c = %02x)\n", frame[2]);
 
     switch (frame[2]) {
     case SET:
@@ -89,7 +95,7 @@ void handle_frame(unsigned char *frame, size_t length) {
     case I(0):
     case I(1): {
         unsigned char s = frame[2] >> 6;
-        send_S_frame(TX_ADDR, ACK((s + 1) % 2), FALSE);
+        send_S_frame(TX_ADDR, ACK(1 - s), FALSE);
         break;
     }
     case UA:
@@ -102,14 +108,23 @@ void handle_frame(unsigned char *frame, size_t length) {
         alarm_handler(0);
         break;
     }
+
+    return frame[2];
+}
+
+size_t expect_frame(unsigned char command, unsigned char addr) {
+    size_t len;
+    do {
+        len = read_frame(fd, frame, addr);
+    } while (handle_frame(frame, len) != command);
+    return len;
 }
 
 void handshake(LinkLayerRole role) {
     if (role == LlTx)
         send_S_frame(TX_ADDR, SET, TRUE);
 
-    size_t len = read_frame(fd, frame, TX_ADDR);
-    handle_frame(frame, len);
+    expect_frame(role == LlTx ? UA : SET, TX_ADDR);
 }
 
 void setupTimeoutHandler() { signal(SIGALRM, alarm_handler); }
@@ -167,19 +182,75 @@ int llopen(LinkLayer connectionParameters) {
 ////////////////////////////////////////////////
 // LLWRITE
 ////////////////////////////////////////////////
+size_t create_I_frame(unsigned char addr, const unsigned char *buf,
+                      size_t len) {
+    frame[0] = FLAG;
+    frame[1] = addr;
+    frame[2] = I(tx_sequence_nr);
+    frame[3] = make_BCC(frame[1], frame[2]);
+
+    size_t buf_i, frame_i;
+    unsigned char bcc = 0;
+
+    for (buf_i = 0, frame_i = 4; buf_i < len; ++buf_i, ++frame_i) {
+        unsigned char c = buf[buf_i];
+
+        if (c == ESC) {
+            frame[frame_i++] = ESC;
+            frame[frame_i] = ESC_ESC;
+        } else if (c == FLAG) {
+            frame[frame_i++] = ESC;
+            frame[frame_i] = ESC_FLAG;
+        } else {
+            frame[frame_i] = c;
+        }
+
+        bcc ^= c;
+    }
+
+    frame[frame_i++] = bcc;
+    frame[frame_i++] = FLAG;
+
+    return frame_i;
+}
+
 int llwrite(const unsigned char *buf, int bufSize) {
     // TODO
 
-    return -1;
+    size_t frame_len = create_I_frame(TX_ADDR, buf, bufSize);
+
+    send_frame(frame, frame_len, TRUE);
+    tx_sequence_nr = 1 - tx_sequence_nr;
+    expect_frame(ACK(tx_sequence_nr), TX_ADDR);
+
+    return frame_len;
 }
 
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
+size_t read_I_frame(unsigned char *buf, size_t len) {
+    size_t buf_i, frame_i;
+    for (buf_i = 0, frame_i = 4; frame_i < len - 1; ++buf_i, ++frame_i) {
+        unsigned char c = frame[frame_i];
+
+        // if (c == ESC)
+        //     c = frame[++frame_i] == ESC_ESC ? ESC : FLAG;
+
+        buf[buf_i] = c;
+    }
+    return buf_i;
+}
+
 int llread(unsigned char *packet) {
     // TODO
 
-    return -1;
+    size_t len = expect_frame(I(rx_sequence_nr), TX_ADDR);
+    rx_sequence_nr = 1 - rx_sequence_nr;
+
+    len = read_I_frame(packet, len);
+
+    return len;
 }
 
 ////////////////////////////////////////////////
