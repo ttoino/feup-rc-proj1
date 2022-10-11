@@ -171,7 +171,7 @@ int llopen(LinkLayer connectionParameters) {
     setupTimeoutHandler();
 
     if (setupSerialConnection(connectionParameters.serialPort, 1, 0) == -1) {
-	return -1 ;
+        return -1;
     }
 
     handshake(connectionParameters.role);
