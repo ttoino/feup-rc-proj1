@@ -38,6 +38,9 @@ run_rx: $(BIN)/main
 run_cable: $(BIN)/cable
 	./$(BIN)/cable
 
+docs: $(BIN)/main
+	doxygen Doxyfile
+
 .PHONY: check_files
 check_files:
 	diff -s $(TX_FILE) $(RX_FILE) || exit 0

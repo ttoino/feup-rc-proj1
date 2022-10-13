@@ -3,9 +3,6 @@
 
 #include <stdlib.h>
 
-#define TRUE 1
-#define FALSE 0
-
 #define BIT_B(b, n) ((b) << (n))
 #define BIT(n) BIT_B(1, n)
 

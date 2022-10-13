@@ -16,136 +16,27 @@
 #include "link_layer.h"
 #include "link_layer/common.h"
 #include "link_layer/frame.h"
+#include "link_layer/timer.h"
 #include "log.h"
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-int fd = 0;
-struct termios oldtermios;
+void handshake(LLConnection *this) {
+    if (this->params.role == LL_TX) {
+        send_frame(this, create_frame(this, SET));
+        frame_destroy(expect_frame(this, UA));
 
-int tx_sequence_nr = 0;
-int rx_sequence_nr = 0;
-
-LinkLayerRole role;
-
-int n_retransmissions;
-int timeout;
-int n_retransmissions_sent;
-
-Frame *last_frame = NULL;
-
-Frame *create_frame(uint8_t cmd) {
-    Frame *frame = malloc(sizeof(Frame));
-
-    frame->address =
-        (IS_COMMAND(cmd) && role == LlRx) || (IS_RESPONSE(cmd) && role == LlTx)
-            ? RX_ADDR
-            : TX_ADDR;
-    frame->command = cmd;
-
-    return frame;
-}
-
-ssize_t send_frame(Frame *frame) {
-    ssize_t bytes_written = write_frame(frame, fd);
-
-    if (IS_COMMAND(frame->command)) {
-        frame_destroy(last_frame);
-        last_frame = frame;
-        n_retransmissions_sent = 0;
-        alarm(timeout);
-    } else {
-        frame_destroy(frame);
-    }
-
-    return bytes_written;
-}
-
-void alarm_handler(int signal) {
-    if (n_retransmissions_sent == n_retransmissions) {
-        ERROR("Max retries achieved, endpoints are probably disconnected, "
-              "closing connection!\n");
-        llclose(FALSE);
-        exit(-1);
-    }
-
-    ALARM("Acknowledgement not received, retrying (c = %02x)\n", last_frame[2]);
-
-    write_frame(last_frame, fd);
-    alarm(timeout);
-    n_retransmissions_sent++;
-}
-
-Frame *handle_frame(Frame *frame) {
-    LOG("Received frame (c = 0x%02x)\n", frame->command);
-
-    switch (frame->command) {
-    case SET:
-    case DISC:
-        send_frame(create_frame(UA));
-        break;
-    case I(0):
-    case I(1): {
-        uint8_t s = frame->command >> 6;
-        send_frame(create_frame(RR(1 - s)));
-        break;
-    }
-    case UA:
-    case RR(0):
-    case RR(1):
-        alarm(0);
-        break;
-    case REJ(0):
-    case REJ(1):
-        alarm_handler(0);
-        break;
-    case I_ERR | I(0):
-    case I_ERR | I(1): {
-        uint8_t s = frame->command >> 6;
-        send_frame(create_frame(REJ(s)));
-        break;
-    }
-    }
-
-    LOG("Handled frame (c = 0x%02x)\n", frame->command);
-
-    return frame;
-}
-
-Frame *expect_frame(uint8_t command) {
-    Frame *frame;
-    while (1) {
-        frame = read_frame(fd, role);
-        handle_frame(frame);
-
-        if (frame->command == command)
-            break;
-
-        if (frame->information != NULL)
-            bv_destroy(frame->information);
-        free(frame);
-    }
-    return frame;
-}
-
-void handshake() {
-    if (role == LlTx) {
-        send_frame(create_frame(SET));
-        frame_destroy(expect_frame(UA));
-        
         LOG("Handshake complete\n");
     }
 }
 
-void setupTimeoutHandler() { signal(SIGALRM, alarm_handler); }
-
-int setupSerialConnection(char *serialPort, int v_min, int v_time) {
+int setup_serial(LLConnection *this) {
     LOG("Setting up serial port connection...\n");
 
-    fd = open(serialPort, O_RDWR | O_NOCTTY);
+    this->fd = open(this->params.serial_port, O_RDWR | O_NOCTTY);
 
-    if (tcgetattr(fd, &oldtermios) == -1) {
+    if (tcgetattr(this->fd, &this->old_termios) == -1) {
         perror("llopen");
         return -1;
     }
@@ -159,12 +50,12 @@ int setupSerialConnection(char *serialPort, int v_min, int v_time) {
     newtermios.c_oflag = 0;
 
     newtermios.c_lflag = 0;
-    newtermios.c_cc[VTIME] = v_time;
-    newtermios.c_cc[VMIN] = v_min;
+    newtermios.c_cc[VTIME] = 1;
+    newtermios.c_cc[VMIN] = 1;
 
-    tcflush(fd, TCIOFLUSH);
+    tcflush(this->fd, TCIOFLUSH);
 
-    if (tcsetattr(fd, TCSANOW, &newtermios) == -1) {
+    if (tcsetattr(this->fd, TCSANOW, &newtermios) == -1) {
         perror("llopen");
         return -1;
     }
@@ -177,46 +68,44 @@ int setupSerialConnection(char *serialPort, int v_min, int v_time) {
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
-int llopen(LinkLayer connectionParameters) {
-    n_retransmissions = connectionParameters.nRetransmissions;
-    n_retransmissions_sent = 0;
-    timeout = connectionParameters.timeout;
-    role = connectionParameters.role;
+LLConnection *llopen(LLConnectionParams params) {
+    LLConnection *this = malloc(sizeof(LLConnection));
 
-    setupTimeoutHandler();
+    this->params = params;
 
-    if (setupSerialConnection(connectionParameters.serialPort, 1, 1) == -1) {
-        return -1;
-    }
+    timer_setup(this);
 
-    handshake();
+    if (setup_serial(this) == -1)
+        return NULL;
 
-    return 1;
+    handshake(this);
+
+    return this;
 }
 
 ////////////////////////////////////////////////
 // LLWRITE
 ////////////////////////////////////////////////
-int llwrite(const unsigned char *buf, int bufSize) {
+int llwrite(LLConnection *this, const unsigned char *buf, int bufSize) {
     LOG("Creating I frame!\n");
 
-    Frame *frame = create_frame(I(tx_sequence_nr));
+    Frame *frame = create_frame(this, I(this->tx_sequence_nr));
     frame->information = bv_create();
     bv_push(frame->information, buf, bufSize);
 
-    LOG("Sending frame N(%d)\n", tx_sequence_nr);
+    LOG("Sending frame N(%d)\n", this->tx_sequence_nr);
 
-    ssize_t bytes_written = send_frame(frame);
+    ssize_t bytes_written = send_frame(this, frame);
 
-    LOG("Sent frame N(%d)\n", tx_sequence_nr);
+    LOG("Sent frame N(%d)\n", this->tx_sequence_nr);
 
-    tx_sequence_nr = 1 - tx_sequence_nr;
+    this->tx_sequence_nr = 1 - this->tx_sequence_nr;
 
-    LOG("Expecting ACK(%d)\n", tx_sequence_nr);
+    LOG("Expecting ACK(%d)\n", this->tx_sequence_nr);
 
-    frame_destroy(expect_frame(RR(tx_sequence_nr)));
+    frame_destroy(expect_frame(this, RR(this->tx_sequence_nr)));
 
-    LOG("Received ACK(%d)\n", tx_sequence_nr);
+    LOG("Received ACK(%d)\n", this->tx_sequence_nr);
 
     return bytes_written;
 }
@@ -224,17 +113,17 @@ int llwrite(const unsigned char *buf, int bufSize) {
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-int llread(uint8_t *packet) {
+int llread(LLConnection *this, uint8_t *packet) {
     LOG("Waiting for I frame\n");
 
-    Frame *frame = expect_frame(I(rx_sequence_nr));
-    rx_sequence_nr = 1 - rx_sequence_nr;
+    Frame *frame = expect_frame(this, I(this->rx_sequence_nr));
+    this->rx_sequence_nr = 1 - this->rx_sequence_nr;
 
     LOG("Reading I frame\n");
 
     memcpy(packet, frame->information->array, frame->information->length);
 
-    LOG("Read I frame with size %d\n", frame->information->length);
+    LOG("Read I frame with size %lu\n", frame->information->length);
 
     int bytes_read = frame->information->length;
 
@@ -246,15 +135,24 @@ int llread(uint8_t *packet) {
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(bool showStatistics) {
-    if (tcsetattr(fd, TCSANOW, &oldtermios) == -1) {
+int llclose(LLConnection *this, bool showStatistics) {
+    if (this->params.role == LL_TX) {
+        send_frame(this, create_frame(this, DISC));
+        frame_destroy(expect_frame(this, DISC));
+    } else if (!this->closed) {
+        frame_destroy(expect_frame(this, DISC));
+    }
+
+    this->closed = true;
+
+    if (tcsetattr(this->fd, TCSANOW, &this->old_termios) == -1) {
         perror("llclose");
         exit(-1); // TODO: change to return
     }
 
-    close(fd);
+    close(this->fd);
 
-    frame_destroy(last_frame);
+    frame_destroy(this->last_command_frame);
 
     LOG("Closing serial port connection\n");
 

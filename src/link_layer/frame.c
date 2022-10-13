@@ -1,6 +1,8 @@
+#include "link_layer/frame.h"
 #include "link_layer.h"
 #include "link_layer/common.h"
-#include "link_layer/frame.h"
+#include "link_layer/timer.h"
+#include "log.h"
 
 #include <stdbool.h>
 #include <unistd.h>
@@ -53,26 +55,47 @@ typedef enum {
     NACK,
 } ReadFrameState;
 
-bool check_command_and_address(Frame *frame, LinkLayerRole role) {
-    return (IS_COMMAND(frame->command) &&
-            ((role == LlRx && frame->address == TX_ADDR) ||
-             (role == LlTx && frame->address == RX_ADDR))) ||
-           (IS_RESPONSE(frame->command) &&
-            ((role == LlRx && frame->address == RX_ADDR) ||
-             (role == LlTx && frame->address == TX_ADDR)));
+Frame *create_frame(LLConnection *connection, uint8_t cmd) {
+    Frame *frame = malloc(sizeof(Frame));
+
+    frame->address =
+        (IS_COMMAND(cmd) && connection->params.role == LL_RX) ||
+                (IS_RESPONSE(cmd) && connection->params.role == LL_TX)
+            ? RX_ADDR
+            : TX_ADDR;
+    frame->command = cmd;
+
+    return frame;
 }
 
-Frame *read_frame(int fd, LinkLayerRole role) {
+/**
+ * @brief Checks if a frame's address and command combination can be handled by
+ *        this layer's role.
+ *
+ * @param frame The frame.
+ * @param role This layer's role
+ *
+ * @return Whether the frame's address and command combination is legal.
+ */
+bool check_command_and_address(Frame *frame, LLRole role) {
+    return (IS_COMMAND(frame->command) &&
+            ((role == LL_RX && frame->address == TX_ADDR) ||
+             (role == LL_TX && frame->address == RX_ADDR))) ||
+           (IS_RESPONSE(frame->command) &&
+            ((role == LL_RX && frame->address == RX_ADDR) ||
+             (role == LL_TX && frame->address == TX_ADDR)));
+}
+
+Frame *read_frame(LLConnection *connection) {
     ReadFrameState state = START;
     Frame *frame = malloc(sizeof(Frame));
     frame->information = NULL;
     uint8_t temp;
 
-    while (TRUE) {
-
+    while (true) {
         switch (state) {
         case START:
-            read(fd, &temp, 1);
+            read(connection->fd, &temp, 1);
 
             if (temp == FLAG)
                 state = FLAG_RCV;
@@ -80,7 +103,7 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             break;
 
         case FLAG_RCV:
-            read(fd, &frame->address, 1);
+            read(connection->fd, &frame->address, 1);
 
             if (frame->address == RX_ADDR || frame->address == TX_ADDR)
                 state = A_RCV;
@@ -92,9 +115,9 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             break;
 
         case A_RCV:
-            read(fd, &frame->command, 1);
+            read(connection->fd, &frame->command, 1);
 
-            if (check_command_and_address(frame, role))
+            if (check_command_and_address(frame, connection->params.role))
                 state = C_RCV;
             else if (frame->command == FLAG)
                 state = FLAG_RCV;
@@ -104,7 +127,7 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             break;
 
         case C_RCV:
-            read(fd, &temp, 1);
+            read(connection->fd, &temp, 1);
 
             if (temp == (frame->address ^ frame->command))
                 state = BCC_RCV;
@@ -119,7 +142,7 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             if ((frame->command & 0xF) == I(0)) {
                 state = DATA_RCV;
             } else {
-                read(fd, &temp, 1);
+                read(connection->fd, &temp, 1);
 
                 if (temp == FLAG)
                     state = END;
@@ -132,7 +155,7 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             if (frame->information == NULL)
                 frame->information = bv_create();
 
-            read(fd, &temp, 1);
+            read(connection->fd, &temp, 1);
 
             if (temp == ESC)
                 state = ESC_RCV;
@@ -144,7 +167,7 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             break;
 
         case ESC_RCV:
-            read(fd, &temp, 1);
+            read(connection->fd, &temp, 1);
             state = DATA_RCV;
 
             if (temp == ESC_ESC)
@@ -207,7 +230,7 @@ void write_info(ByteVector *buf, Frame *frame) {
     bv_pushb(buf, bcc);
 }
 
-ssize_t write_frame(Frame *frame, int fd) {
+ssize_t write_frame(LLConnection *connection, Frame *frame) {
     ByteVector *buf = bv_create();
 
     bv_pushb(buf, FLAG);
@@ -220,19 +243,91 @@ ssize_t write_frame(Frame *frame, int fd) {
 
     bv_pushb(buf, FLAG);
 
-    int bytes_written = write(fd, buf->array, buf->length);
+    int bytes_written = write(connection->fd, buf->array, buf->length);
 
     bv_destroy(buf);
 
     return bytes_written;
 }
 
-void frame_destroy(Frame* this) {
-
-    if (this == NULL) return;
+void frame_destroy(Frame *this) {
+    if (this == NULL)
+        return;
 
     if (this->information != NULL)
         bv_destroy(this->information);
 
     free(this);
+}
+
+ssize_t send_frame(LLConnection *connection, Frame *frame) {
+    ssize_t bytes_written = write_frame(connection, frame);
+
+    if (IS_COMMAND(frame->command)) {
+        frame_destroy(connection->last_command_frame);
+        connection->last_command_frame = frame;
+        connection->n_retransmissions_sent = 0;
+        timer_arm(connection);
+    } else {
+        frame_destroy(frame);
+    }
+
+    return bytes_written;
+}
+
+Frame *handle_frame(LLConnection *connection, Frame *frame) {
+    LOG("Received frame (c = 0x%02x)\n", frame->command);
+
+    switch (frame->command) {
+    case SET:
+        send_frame(connection, create_frame(connection, UA));
+        break;
+    case DISC:
+        if (connection->params.role == LL_RX) {
+            send_frame(connection, create_frame(connection, DISC));
+            frame_destroy(expect_frame(connection, UA));
+        } else {
+            send_frame(connection, create_frame(connection, UA));
+        }
+        break;
+    case I(0):
+    case I(1): {
+        uint8_t s = frame->command >> 6;
+        send_frame(connection, create_frame(connection, RR(1 - s)));
+        break;
+    }
+    case UA:
+    case RR(0):
+    case RR(1):
+        timer_disarm(connection);
+        break;
+    case REJ(0):
+    case REJ(1):
+        timer_force(connection);
+        break;
+    case I_ERR | I(0):
+    case I_ERR | I(1): {
+        uint8_t s = frame->command >> 6;
+        send_frame(connection, create_frame(connection, REJ(s)));
+        break;
+    }
+    }
+
+    LOG("Handled frame (c = 0x%02x)\n", frame->command);
+
+    return frame;
+}
+
+Frame *expect_frame(LLConnection *connection, uint8_t command) {
+    Frame *frame;
+    while (1) {
+        frame = read_frame(connection);
+        handle_frame(connection, frame);
+
+        if (frame->command == command)
+            break;
+
+        frame_destroy(frame);
+    }
+    return frame;
 }

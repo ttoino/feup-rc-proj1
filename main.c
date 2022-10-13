@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    const char *serialPort = argv[1];
+    const char *serial_port = argv[1];
     const char *role = argv[2];
     const char *filename = argv[3];
 
@@ -31,9 +31,9 @@ int main(int argc, char *argv[]) {
            "  - Number of tries: %d\n"
            "  - Timeout: %d\n"
            "  - Filename: %s\n",
-           serialPort, role, BAUDRATE, N_TRIES, TIMEOUT, filename);
+           serial_port, role, BAUDRATE, N_TRIES, TIMEOUT, filename);
 
-    applicationLayer(serialPort, role, BAUDRATE, N_TRIES, TIMEOUT, filename);
+    applicationLayer(serial_port, role, BAUDRATE, N_TRIES, TIMEOUT, filename);
 
     return 0;
 }

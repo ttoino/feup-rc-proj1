@@ -6,6 +6,11 @@
 
 #define BUFFER 64
 
+/**
+ * @brief Resizes a vector if its current capacity is too low.
+ *
+ * @param this The vector to resize.
+ */
 void resize_if_needed(ByteVector *this) {
     if (this->capacity < this->length) {
         this->capacity = this->length + BUFFER;
@@ -24,7 +29,8 @@ ByteVector *bv_create() {
 
 void bv_destroy(ByteVector *this) {
 
-    if (this == NULL) return;
+    if (this == NULL)
+        return;
 
     free(this->array);
     free(this);

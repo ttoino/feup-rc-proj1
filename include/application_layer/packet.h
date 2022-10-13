@@ -9,22 +9,15 @@
 
 /**
  * @brief Represents the type of packet that is being sent
- * 
+ *
  */
-enum packet_type {
-    DATA = 1,
-    START,
-    END
-};
+enum packet_type { DATA = 1, START, END };
 
 /**
- * @brief Helper enum for 
- * 
+ * @brief Helper enum for
+ *
  */
-enum control_packet_field_type {
-    FILE_SIZE,
-    FILE_NAME
-};
+enum control_packet_field_type { FILE_SIZE, FILE_NAME };
 
 /**
  * @brief A struct representing a packet.
@@ -33,13 +26,14 @@ typedef struct {
 
     /**
      * @brief the type of this packet.
-     * 
+     *
      * This is separated for ease of use.
      */
     enum packet_type type;
 
     /**
-     * @brief Packet data. Contains all the bytes related to this packet, excluding the packet type.
+     * @brief Packet data. Contains all the bytes related to this packet,
+     * excluding the packet type.
      *
      * Can be null, see END control packets.
      */
@@ -48,9 +42,9 @@ typedef struct {
 
 /**
  * @brief Deallocates resources used for a packet.
- * 
- * @param this the packet to deallocate 
+ *
+ * @param this the packet to deallocate
  */
-void packet_destroy(Packet* this);
+void packet_destroy(Packet *this);
 
 #endif // _PACKET_H_

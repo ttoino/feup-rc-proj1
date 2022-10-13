@@ -8,8 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -22,17 +22,16 @@
 
 #define BUF_SIZE 2048
 
-typedef enum
-{
+typedef enum {
     CableModeOn,
     CableModeOff,
     CableModeNoise,
 } CableMode;
 
 // Returns: serial port file descriptor (fd).
-int openSerialPort(const char *serialPort, struct termios *oldtio, struct termios *newtio)
-{
-    int fd = open(serialPort, O_RDWR | O_NOCTTY);
+int openSerialPort(const char *serial_port, struct termios *oldtio,
+                   struct termios *newtio) {
+    int fd = open(serial_port, O_RDWR | O_NOCTTY);
 
     if (fd < 0)
         return -1;
@@ -57,32 +56,35 @@ int openSerialPort(const char *serialPort, struct termios *oldtio, struct termio
 }
 
 // Add noise to a buffer, by flipping the byte in the "errorIndex" position.
-void addNoiseToBuffer(unsigned char *buf, size_t errorIndex)
-{
+void addNoiseToBuffer(unsigned char *buf, size_t errorIndex) {
     buf[errorIndex] ^= 0xFF;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     printf("\n");
 
-    system("socat -dd PTY,link=/dev/ttyS10,mode=777 PTY,link=/dev/emulatorTx,mode=777 &");
+    system("socat -dd PTY,link=/dev/ttyS10,mode=777 "
+           "PTY,link=/dev/emulatorTx,mode=777 &");
     sleep(1);
     printf("\n");
 
-    system("socat -dd PTY,link=/dev/ttyS11,mode=777 PTY,link=/dev/emulatorRx,mode=777 &");
+    system("socat -dd PTY,link=/dev/ttyS11,mode=777 "
+           "PTY,link=/dev/emulatorRx,mode=777 &");
     sleep(1);
 
-    printf("\n\n"
-           "Transmitter must open /dev/ttyS10\n"
-           "Receiver must open /dev/ttyS11\n"
-           "\n"
-           "The cable program is sensible to the following interactive commands:\n"
-           "--- on           : connect the cable and data is exchanged (default state)\n"
-           "--- off          : disconnect the cable disabling data to be exchanged\n"
-           "--- noise        : add fixed noise to the cable\n"
-           "--- end          : terminate the program\n"
-           "\n");
+    printf(
+        "\n\n"
+        "Transmitter must open /dev/ttyS10\n"
+        "Receiver must open /dev/ttyS11\n"
+        "\n"
+        "The cable program is sensible to the following interactive commands:\n"
+        "--- on           : connect the cable and data is exchanged (default "
+        "state)\n"
+        "--- off          : disconnect the cable disabling data to be "
+        "exchanged\n"
+        "--- noise        : add fixed noise to the cable\n"
+        "--- end          : terminate the program\n"
+        "\n");
 
     // Configure serial ports
     struct termios oldtioTx;
@@ -90,8 +92,7 @@ int main(int argc, char *argv[])
 
     int fdTx = openSerialPort("/dev/emulatorTx", &oldtioTx, &newtioTx);
 
-    if (fdTx < 0)
-    {
+    if (fdTx < 0) {
         perror("Opening Tx emulator serial port");
         exit(-1);
     }
@@ -101,8 +102,7 @@ int main(int argc, char *argv[])
 
     int fdRx = openSerialPort("/dev/emulatorRx", &oldtioRx, &newtioRx);
 
-    if (fdRx < 0)
-    {
+    if (fdRx < 0) {
         perror("Opening Rx emulator serial port");
         exit(-1);
     }
@@ -120,73 +120,60 @@ int main(int argc, char *argv[])
 
     printf("Cable ready\n");
 
-    while (STOP == FALSE)
-    {
+    while (STOP == FALSE) {
         // Read from Tx
         int bytesFromTx = read(fdTx, tx2rx, BUF_SIZE);
 
-        if (bytesFromTx > 0)
-        {
-            if (cableMode == CableModeOff)
-            {
-                printf("bytesFromTx=%d > bytesToRx=CONNECTION OFF\n", bytesFromTx);
-            }
-            else
-            {
-                if (cableMode == CableModeNoise)
-                {
+        if (bytesFromTx > 0) {
+            if (cableMode == CableModeOff) {
+                printf("bytesFromTx=%d > bytesToRx=CONNECTION OFF\n",
+                       bytesFromTx);
+            } else {
+                if (cableMode == CableModeNoise) {
                     addNoiseToBuffer(tx2rx, 0);
                 }
 
                 int bytesToRx = write(fdRx, tx2rx, bytesFromTx);
-                printf("bytesFromTx=%d > bytesToRx=%d\n", bytesFromTx, bytesToRx);
+                printf("bytesFromTx=%d > bytesToRx=%d\n", bytesFromTx,
+                       bytesToRx);
             }
         }
 
         // Read from Rx
         int bytesFromRx = read(fdRx, rx2tx, BUF_SIZE);
 
-        if (bytesFromRx > 0)
-        {
-            if (cableMode == CableModeOff)
-            {
-                printf("bytesToTx=CONNECTION OFF < bytesFromRx=%d\n", bytesFromRx);
-            }
-            else
-            {
-                if (cableMode == CableModeNoise)
-                {
+        if (bytesFromRx > 0) {
+            if (cableMode == CableModeOff) {
+                printf("bytesToTx=CONNECTION OFF < bytesFromRx=%d\n",
+                       bytesFromRx);
+            } else {
+                if (cableMode == CableModeNoise) {
                     addNoiseToBuffer(rx2tx, 0);
                 }
 
                 int bytesToTx = write(fdTx, rx2tx, bytesFromRx);
-                printf("bytesToTx=%d < bytesFromRx=%d\n", bytesToTx, bytesFromRx);
+                printf("bytesToTx=%d < bytesFromRx=%d\n", bytesToTx,
+                       bytesFromRx);
             }
         }
 
         // Read commands from STDIN to control the cable mode
         int fromStdin = read(STDIN_FILENO, rxStdin, BUF_SIZE);
-        if (fromStdin > 0)
-        {
+        if (fromStdin > 0) {
             rxStdin[fromStdin - 1] = '\0';
 
-            if (strcmp(rxStdin, "off") == 0 || strcmp(rxStdin, "0") == 0)
-            {
+            if (strcmp(rxStdin, "off") == 0 || strcmp(rxStdin, "0") == 0) {
                 printf("CONNECTION OFF\n");
                 cableMode = CableModeOff;
-            }
-            else if (strcmp(rxStdin, "on") == 0 || strcmp(rxStdin, "1") == 0)
-            {
+            } else if (strcmp(rxStdin, "on") == 0 ||
+                       strcmp(rxStdin, "1") == 0) {
                 printf("CONNECTION ON\n");
                 cableMode = CableModeOn;
-            }
-            else if (strcmp(rxStdin, "noise") == 0 || strcmp(rxStdin, "2") == 0)
-            {
+            } else if (strcmp(rxStdin, "noise") == 0 ||
+                       strcmp(rxStdin, "2") == 0) {
                 printf("CONNECTION NOISE\n");
                 cableMode = CableModeNoise;
-            }
-            else if (strcmp(rxStdin, "end") == 0)
-            {
+            } else if (strcmp(rxStdin, "end") == 0) {
                 printf("END OF THE PROGRAM\n");
                 STOP = TRUE;
             }
@@ -194,14 +181,12 @@ int main(int argc, char *argv[])
     }
 
     // Restore the old port settings
-    if (tcsetattr(fdRx, TCSANOW, &oldtioRx) == -1)
-    {
+    if (tcsetattr(fdRx, TCSANOW, &oldtioRx) == -1) {
         perror("tcsetattr");
         exit(-1);
     }
 
-    if (tcsetattr(fdTx, TCSANOW, &oldtioTx) == -1)
-    {
+    if (tcsetattr(fdTx, TCSANOW, &oldtioTx) == -1) {
         perror("tcsetattr");
         exit(-1);
     }

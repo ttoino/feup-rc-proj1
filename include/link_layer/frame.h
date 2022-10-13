@@ -1,6 +1,11 @@
 #ifndef _FRAME_H_
 #define _FRAME_H_
 
+/**
+ * @brief A struct representing a frame.
+ */
+typedef struct _Frame Frame;
+
 #include "byte_vector.h"
 #include "link_layer.h"
 #include <stdint.h>
@@ -86,10 +91,7 @@
  */
 #define ESC_ESC (uint8_t)0x5d
 
-/**
- * @brief A struct representing a frame.
- */
-typedef struct {
+struct _Frame {
     /**
      * @brief This frame's address.
      *
@@ -110,7 +112,9 @@ typedef struct {
      * Only sent on #I frames.
      */
     ByteVector *information;
-} Frame;
+};
+
+Frame *create_frame(LLConnection *connection, uint8_t cmd);
 
 /**
  * @brief Reads a frame from the specified file.
@@ -120,7 +124,7 @@ typedef struct {
  *
  * @return The frame that was read.
  */
-Frame *read_frame(int fd, LinkLayerRole role);
+Frame *read_frame(LLConnection *connection);
 
 /**
  * @brief Write a frame onto the specified file.
@@ -131,13 +135,17 @@ Frame *read_frame(int fd, LinkLayerRole role);
  * @return The number of bytes written.
  * @return -1 on error.
  */
-ssize_t write_frame(Frame *frame, int fd);
+ssize_t write_frame(LLConnection *connection, Frame *frame);
 
 /**
  * @brief Deallocates resources created by a frame.
- * 
- * @param this the frame to deallocate.
+ *
+ * @param this The frame to deallocate.
  */
-void frame_destroy(Frame* this);
+void frame_destroy(Frame *this);
+
+ssize_t send_frame(LLConnection *connection, Frame *frame);
+
+Frame *expect_frame(LLConnection *connection, uint8_t command);
 
 #endif // _FRAME_H_
