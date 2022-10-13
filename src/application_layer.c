@@ -8,90 +8,98 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "byte_vector.h"
 #include "application_layer.h"
+#include "application_layer/packet.h"
 #include "link_layer.h"
 #include "log.h"
 
-unsigned char n = 0;
+int send_packet(Packet *packet) {
+    ByteVector *bv = bv_create();
 
-int create_control_packet(unsigned char **packet, enum packet_type packet_type,
+    bv_push(bv, &packet->type, sizeof(packet->type));
+
+    if (packet->information != NULL)
+        bv_push(bv, packet->information->array, packet->information->length);
+
+    int result = llwrite(bv->array, bv->length);
+
+    bv_destroy(bv);
+
+    return result;
+}
+
+Packet* create_control_packet(enum packet_type packet_type,
                           size_t file_size, const char *file_name) {
 
-    int size = 0;
-    unsigned char *control_packet = NULL;
+    Packet* packet = (Packet*)malloc(sizeof(Packet));
 
-    if (packet_type == END) {
-        control_packet = malloc(1 * sizeof(unsigned char));
-        *control_packet = END;
-        size = 1;
-    } else if (packet_type == START) {
+    packet->type = packet_type;
+    packet->information = NULL;
 
-        // TODO: lengths maybe should be normalized
-
-        size = sizeof(START) +
-               //      type                length                  value
-               sizeof(FILE_SIZE) + sizeof(sizeof(file_size)) +
-               sizeof(file_size) + sizeof(FILE_NAME) +
-               sizeof(strlen(file_name)) + strlen(file_name);
-
-        control_packet = malloc(size * sizeof(unsigned char));
-
-        size_t offset = 0;
-
-        memcpy(control_packet + offset, &packet_type, sizeof(enum packet_type));
-        offset += sizeof(enum packet_type);
+    if (packet_type == START) {
+        packet->information = bv_create();
 
         enum control_packet_field_type field_type = FILE_SIZE;
-        memcpy(control_packet + offset, &field_type,
-               sizeof(enum control_packet_field_type));
-        offset += sizeof(enum control_packet_field_type);
-
-        unsigned long file_size_length = sizeof(file_size);
-        memcpy(control_packet + offset, &file_size_length,
-               sizeof(file_size_length));
-        offset += sizeof(file_size_length);
-
-        memcpy(control_packet + offset, &file_size, file_size_length);
-        offset += file_size_length;
-
+        size_t file_size_length = sizeof(file_size);
+        bv_push(packet->information, &field_type, sizeof(enum control_packet_field_type));
+        bv_push(packet->information, &file_size_length, sizeof(size_t));
+        bv_push(packet->information, &file_size, file_size_length);
+                
         field_type = FILE_NAME;
-        memcpy(control_packet + offset, &field_type,
-               sizeof(enum control_packet_field_type));
-        offset += sizeof(enum control_packet_field_type);
+        size_t file_name_length = strlen(file_name);
+        bv_push(packet->information, &field_type, sizeof(enum control_packet_field_type));
+        bv_push(packet->information, &file_name_length, sizeof(file_name_length));
+        bv_push(packet->information, &file_name, file_name_length);
+    }
 
-        unsigned long file_name_length = strlen(file_name);
-        memcpy(control_packet + offset, &file_name_length,
-               sizeof(file_name_length));
-        offset += sizeof(file_size_length);
-
-        memcpy(control_packet + offset, &file_name, file_name_length);
-        offset += file_name_length;
-
-    } else
-        printf("%d is not a valid control packet indicator\n", packet_type);
-
-    *packet = control_packet;
-    return size;
+    return packet;
 }
 
 int send_control_packet(enum packet_type packet_type, size_t file_size,
                         char *file_name) {
 
-    unsigned char *control_packet = NULL;
-    int packet_size = create_control_packet(&control_packet, packet_type,
-                                            file_size, file_name);
+    Packet* packet = create_control_packet(packet_type, file_size, file_name);
 
-    LOG("Sending control packet!\n");
+    char* packet_type_name = packet_type == START ? "START" : "END";
 
-    if (llwrite(control_packet, packet_size) == -1) {
-        ERROR("Could not send START packet\n");
+    LOG("Sending %s control packet!\n", packet_type_name);
 
-        return -1;
-    }
-    free(control_packet);
+    int result = send_packet(packet);
 
-    LOG("Control packet sent\n");
-    return 1;
+    packet_destroy(packet);
+
+    if (result == -1)
+        ERROR("Could not send %s packet\n", packet_type_name);
+    else
+        LOG("Control packet sent\n");
+    return result;
+}
+
+int send_data_packet(unsigned char *buf, size_t len) {
+
+    // TODO: maybe make this a Packet attribute
+    static unsigned char sequence_number = 0;
+
+    Packet* packet = (Packet*)malloc(sizeof(Packet));
+
+    packet->type = DATA;
+    packet->information = bv_create();
+
+    fill_data_packet_header(packet, len, sequence_number++);
+
+    bv_push(packet->information, buf, len);
+
+    int result = send_packet(packet);
+
+    packet_destroy(packet);
+
+    if (result == -1)
+        ERROR("Could not send DATA packet with length %d\n", len);
+    else
+        LOG("Data packet sent\n");
+
+    return result;
 }
 
 LinkLayer setupLLParams(const char *serialPort, const char *role, int baudRate,
@@ -120,20 +128,46 @@ void connect(LinkLayer ll) {
         exit(-1);
     }
 
-    LOG("Connection established\n");
+    if (ll.role == LlTx) {
+       LOG("Connection established\n");
+    }
 }
 
 /**
  * Fills in the packet header for the given packet
  */
-void fill_data_packet_header(unsigned char *packet, int fragment_size,
+void fill_data_packet_header(Packet* packet, int fragment_size,
                              int sequence_number) {
 
-    packet[0] = DATA;
-    packet[1] = (unsigned char)sequence_number;
-    packet[2] = (unsigned char)((fragment_size & 0xFF00) >> 8);
-    packet[3] = (unsigned char)(fragment_size & 0xFF);
+    if (packet == NULL) return;
+
+    if (packet->information == NULL)
+        packet->information = bv_create();
+
+    bv_pushb(packet->information, (unsigned char)sequence_number);
+    bv_pushb(packet->information, (unsigned char)((fragment_size & 0xFF00) >> 8));
+    bv_pushb(packet->information, (unsigned char)(fragment_size & 0xFF));
 }
+
+int init_transmission(char* filename) {
+    struct stat st;
+
+    if (stat(filename, &st) != 0) {
+        perror("Could not determine size of file to transmit");
+        return -1;
+    }
+
+    if (send_control_packet(START, st.st_size, filename) == -1) {
+        ERROR("Error sending START packet for file: %s\n", filename);
+        return -1;
+    }
+
+    LOG("Successfully sent START packet!\n");
+
+    return 1;
+}
+
+#define MAX_PAYLOAD_SIZE (1000 - 3 - sizeof(DATA))
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename) {
@@ -142,42 +176,82 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     connect(ll);
 
-    unsigned char s[1024];
+    unsigned char packet_data[MAX_PAYLOAD_SIZE];
     if (ll.role == LlRx) {
+
+        unsigned char* packet_ptr = NULL;
+        int fd;
+
         while (true) {
-            llread(s);
-            printf("\"%s\"\n", s);
+            int bytes_read = llread(packet_data);
+            packet_ptr = packet_data;
+
+            LOG("Processing packet\n");
+
+            enum packet_type packet_type = *(enum packet_type *)packet_ptr;
+            packet_ptr += sizeof(enum packet_type);
+
+            // TODO: this should be refactored
+
+            if (packet_type == END) break;
+            else if (packet_type == START) {
+                size_t filesize_length = *(size_t*)packet_ptr;
+                packet_ptr += sizeof(size_t);
+
+                // TODO: do something with filesize
+                size_t filesize = *(size_t*)packet_ptr;
+                packet_ptr += sizeof(size_t);
+
+                size_t filename_length = *(size_t*)packet_ptr;
+                packet_ptr += sizeof(size_t);
+
+                // TODO: get filename
+                packet_ptr += filename_length;
+
+                LOG("Opening file descriptor for file: %s\n", filename);
+
+                fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC);
+
+                if (fd == -1) {
+                    perror("opening RX fd");
+                    exit(-1);
+                }
+
+            } else if (packet_type == DATA) {
+                unsigned char sequence_number = *(unsigned char*)packet_ptr;
+                packet_ptr += sizeof(unsigned char);
+
+                unsigned char fragment_size_h = *(unsigned char*)packet_ptr;
+                packet_ptr += sizeof(unsigned char);
+                unsigned char fragment_size_l = *(unsigned char*)packet_ptr;
+                packet_ptr += sizeof(unsigned char);
+
+                uint16_t fragment_size = (fragment_size_h << 8) | fragment_size_l;
+
+                LOG("Writing %d bytes to %s\n", fragment_size, filename);
+
+                if (write(fd, packet_ptr, fragment_size) == -1) {
+                    perror("writing to RX fd");
+                    exit(-1);
+                }
+            }
         }
     } else {
 
-        struct stat st;
-
-        if (stat(filename, &st) != 0) {
-            perror("Could not determine size of file to transmit");
+        if (init_transmission(filename) == -1) {
             exit(-1);
         }
-
-        if (send_control_packet(START, st.st_size, filename) == -1) {
-            ERROR("Error sending START packet for file: %s\n", filename);
-            exit(-1);
-        }
-
-        LOG("Successfully sent START packet!\n");
 
 // TODO: Use ByteVector
-#define MAX_PAYLOAD_SIZE 1024
-
-        unsigned char packet[MAX_PAYLOAD_SIZE];
 
         int fd = open(filename, O_RDWR | O_NOCTTY);
-
         if (fd == -1) {
             perror("Error opening file in transmitter!");
             exit(-1);
         }
 
         while (true) {
-            int bytes_read = read(fd, (packet + 4), MAX_PAYLOAD_SIZE - 4);
+            int bytes_read = read(fd, packet_data, MAX_PAYLOAD_SIZE);
 
             if (bytes_read == -1) {
                 perror("Error reading file fragment, aborting");
@@ -192,12 +266,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
                 break;
             } else {
-                fill_data_packet_header(packet, bytes_read, n++);
-
-                // send DATA packet
-                if (llwrite(packet, bytes_read + 4) == -1) {
-                    ERROR("Error sending data packet %d\n", n - 1);
-                }
+                send_data_packet(packet_data, bytes_read);
             }
         }
     }

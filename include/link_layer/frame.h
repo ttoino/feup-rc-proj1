@@ -133,4 +133,11 @@ Frame *read_frame(int fd, LinkLayerRole role);
  */
 ssize_t write_frame(Frame *frame, int fd);
 
+/**
+ * @brief Deallocates resources created by a frame.
+ * 
+ * @param this the frame to deallocate.
+ */
+void frame_destroy(Frame* this);
+
 #endif // _FRAME_H_

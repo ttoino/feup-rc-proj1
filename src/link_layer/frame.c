@@ -69,6 +69,7 @@ Frame *read_frame(int fd, LinkLayerRole role) {
     uint8_t temp;
 
     while (TRUE) {
+
         switch (state) {
         case START:
             read(fd, &temp, 1);
@@ -177,4 +178,61 @@ Frame *read_frame(int fd, LinkLayerRole role) {
             return frame;
         }
     }
+}
+
+/**
+ * @brief Writes the byte stuffed information from an I frame into a buffer.
+ *
+ * @param buf Where to write the information.
+ * @param frame The frame.
+ */
+void write_info(ByteVector *buf, Frame *frame) {
+    uint8_t bcc = 0, temp;
+
+    for (size_t i = 0; i < frame->information->length; ++i) {
+        temp = bv_get(frame->information, i);
+        bcc ^= temp;
+
+        if (temp == FLAG) {
+            bv_pushb(buf, ESC);
+            bv_pushb(buf, ESC_FLAG);
+        } else if (temp == ESC) {
+            bv_pushb(buf, ESC);
+            bv_pushb(buf, ESC_ESC);
+        } else {
+            bv_pushb(buf, temp);
+        }
+    }
+
+    bv_pushb(buf, bcc);
+}
+
+ssize_t write_frame(Frame *frame, int fd) {
+    ByteVector *buf = bv_create();
+
+    bv_pushb(buf, FLAG);
+    bv_pushb(buf, frame->address);
+    bv_pushb(buf, frame->command);
+    bv_pushb(buf, frame->address ^ frame->command);
+
+    if ((frame->command & 0xF) == I(0) && frame->information != NULL)
+        write_info(buf, frame);
+
+    bv_pushb(buf, FLAG);
+
+    int bytes_written = write(fd, buf->array, buf->length);
+
+    bv_destroy(buf);
+
+    return bytes_written;
+}
+
+void frame_destroy(Frame* this) {
+
+    if (this == NULL) return;
+
+    if (this->information != NULL)
+        bv_destroy(this->information);
+
+    free(this);
 }

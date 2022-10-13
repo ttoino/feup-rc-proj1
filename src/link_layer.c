@@ -51,12 +51,12 @@ ssize_t send_frame(Frame *frame) {
     ssize_t bytes_written = write_frame(frame, fd);
 
     if (IS_COMMAND(frame->command)) {
-        free(last_frame);
+        frame_destroy(last_frame);
         last_frame = frame;
         n_retransmissions_sent = 0;
         alarm(timeout);
     } else {
-        free(frame);
+        frame_destroy(frame);
     }
 
     return bytes_written;
@@ -132,10 +132,10 @@ Frame *expect_frame(uint8_t command) {
 void handshake() {
     if (role == LlTx) {
         send_frame(create_frame(SET));
-        expect_frame(UA);
+        frame_destroy(expect_frame(UA));
+        
+        LOG("Handshake complete\n");
     }
-
-    LOG("Handshake complete\n");
 }
 
 void setupTimeoutHandler() { signal(SIGALRM, alarm_handler); }
@@ -185,7 +185,7 @@ int llopen(LinkLayer connectionParameters) {
 
     setupTimeoutHandler();
 
-    if (setupSerialConnection(connectionParameters.serialPort, 1, 0) == -1) {
+    if (setupSerialConnection(connectionParameters.serialPort, 1, 1) == -1) {
         return -1;
     }
 
@@ -206,7 +206,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
     LOG("Sending frame N(%d)\n", tx_sequence_nr);
 
-    send_frame(frame);
+    ssize_t bytes_written = send_frame(frame);
 
     LOG("Sent frame N(%d)\n", tx_sequence_nr);
 
@@ -214,11 +214,11 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
     LOG("Expecting ACK(%d)\n", tx_sequence_nr);
 
-    free(expect_frame(RR(tx_sequence_nr)));
+    frame_destroy(expect_frame(RR(tx_sequence_nr)));
 
     LOG("Received ACK(%d)\n", tx_sequence_nr);
 
-    return frame->information->length;
+    return bytes_written;
 }
 
 ////////////////////////////////////////////////
@@ -236,7 +236,11 @@ int llread(uint8_t *packet) {
 
     LOG("Read I frame with size %d\n", frame->information->length);
 
-    return frame->information->length;
+    int bytes_read = frame->information->length;
+
+    frame_destroy(frame);
+
+    return bytes_read;
 }
 
 ////////////////////////////////////////////////
@@ -250,7 +254,7 @@ int llclose(bool showStatistics) {
 
     close(fd);
 
-    free(last_frame);
+    frame_destroy(last_frame);
 
     LOG("Closing serial port connection\n");
 
