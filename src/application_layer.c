@@ -18,7 +18,7 @@ int create_control_packet(unsigned char **packet, enum packet_type packet_type,
                           size_t file_size, const char *file_name) {
 
     int size = 0;
-    unsigned char* control_packet = NULL;
+    unsigned char *control_packet = NULL;
 
     if (packet_type == END) {
         control_packet = malloc(1 * sizeof(unsigned char));
@@ -29,9 +29,10 @@ int create_control_packet(unsigned char **packet, enum packet_type packet_type,
         // TODO: lengths maybe should be normalized
 
         size = sizeof(START) +
-                //      type                length                  value
-                sizeof(FILE_SIZE) + sizeof(sizeof(file_size)) + sizeof(file_size) +
-                sizeof(FILE_NAME) + sizeof(strlen(file_name)) + strlen(file_name);
+               //      type                length                  value
+               sizeof(FILE_SIZE) + sizeof(sizeof(file_size)) +
+               sizeof(file_size) + sizeof(FILE_NAME) +
+               sizeof(strlen(file_name)) + strlen(file_name);
 
         control_packet = malloc(size * sizeof(unsigned char));
 
@@ -41,22 +42,26 @@ int create_control_packet(unsigned char **packet, enum packet_type packet_type,
         offset += sizeof(enum packet_type);
 
         enum control_packet_field_type field_type = FILE_SIZE;
-        memcpy(control_packet + offset, &field_type, sizeof(enum control_packet_field_type));
+        memcpy(control_packet + offset, &field_type,
+               sizeof(enum control_packet_field_type));
         offset += sizeof(enum control_packet_field_type);
 
         unsigned long file_size_length = sizeof(file_size);
-        memcpy(control_packet + offset, &file_size_length, sizeof(file_size_length));
+        memcpy(control_packet + offset, &file_size_length,
+               sizeof(file_size_length));
         offset += sizeof(file_size_length);
 
         memcpy(control_packet + offset, &file_size, file_size_length);
         offset += file_size_length;
 
         field_type = FILE_NAME;
-        memcpy(control_packet + offset, &field_type, sizeof(enum control_packet_field_type));
+        memcpy(control_packet + offset, &field_type,
+               sizeof(enum control_packet_field_type));
         offset += sizeof(enum control_packet_field_type);
 
         unsigned long file_name_length = strlen(file_name);
-        memcpy(control_packet + offset, &file_name_length, sizeof(file_name_length));
+        memcpy(control_packet + offset, &file_name_length,
+               sizeof(file_name_length));
         offset += sizeof(file_size_length);
 
         memcpy(control_packet + offset, &file_name, file_name_length);
@@ -90,7 +95,7 @@ int send_control_packet(enum packet_type packet_type, size_t file_size,
 }
 
 LinkLayer setupLLParams(const char *serialPort, const char *role, int baudRate,
-                      int nTries, int timeout) {
+                        int nTries, int timeout) {
     LinkLayer ll = {
         .baudRate = baudRate, .nRetransmissions = nTries, .timeout = timeout};
 
@@ -111,7 +116,7 @@ void connect(LinkLayer ll) {
 
     if (llopen(ll) == -1) {
         ERROR("Serial connection on port %s not available, aborting\n",
-               ll.serialPort);
+              ll.serialPort);
         exit(-1);
     }
 
@@ -139,7 +144,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     unsigned char s[1024];
     if (ll.role == LlRx) {
-        while (TRUE) {
+        while (true) {
             llread(s);
             printf("\"%s\"\n", s);
         }
@@ -159,15 +164,19 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         LOG("Successfully sent START packet!\n");
 
+// TODO: Use ByteVector
+#define MAX_PAYLOAD_SIZE 1024
+
         unsigned char packet[MAX_PAYLOAD_SIZE];
-        while (TRUE) {
-            int fd = open(filename, O_RDWR | O_NOCTTY);
 
-            if (fd == -1) {
-                perror("Error opening file in transmitter!");
-                exit(-1);
-            }
+        int fd = open(filename, O_RDWR | O_NOCTTY);
 
+        if (fd == -1) {
+            perror("Error opening file in transmitter!");
+            exit(-1);
+        }
+
+        while (true) {
             int bytes_read = read(fd, (packet + 4), MAX_PAYLOAD_SIZE - 4);
 
             if (bytes_read == -1) {
@@ -193,5 +202,5 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         }
     }
 
-    llclose(FALSE);
+    llclose(false);
 }

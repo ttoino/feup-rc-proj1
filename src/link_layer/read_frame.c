@@ -1,113 +1,180 @@
-#include "link_layer/read_frame.h"
 #include "link_layer.h"
 #include "link_layer/common.h"
+#include "link_layer/frame.h"
 
+#include <stdbool.h>
 #include <unistd.h>
 
+/**
+ * @brief An enum representing the valid states in the state machine for reading
+ *        a frame.
+ */
 typedef enum {
+    /**
+     * @brief The starting state.
+     */
     START,
+    /**
+     * @brief The state after the first #FLAG was read.
+     */
     FLAG_RCV,
+    /**
+     * @brief The state after the address was read.
+     */
     A_RCV,
+    /**
+     * @brief The state after the command was read.
+     */
     C_RCV,
+    /**
+     * @brief The state after the bcc was read and verified.
+     */
     BCC_RCV,
+    /**
+     * @brief The state after some data in an I frame was read.
+     */
     DATA_RCV,
+    /**
+     * @brief The state after an #ESC byte was read.
+     */
     ESC_RCV,
+    /**
+     * @brief The state after the last #FLAG was received.
+     */
     END_FLAG_RCV,
+    /**
+     * @brief The last state, means the state machine accepted the frame.
+     */
     END,
+    /**
+     * @brief The error state, means there was an error in the body of an I
+     *        frame.
+     */
     NACK,
 } ReadFrameState;
 
-ReadFrameState read_header_byte(int fd, unsigned char *dest,
-                                unsigned char expected,
-                                ReadFrameState next_state) {
-    read(fd, dest, 1);
-    if (*dest == expected)
-        return next_state;
-    if (*dest == FLAG)
-        return FLAG_RCV;
-    else
-        return START;
+bool check_command_and_address(Frame *frame, LinkLayerRole role) {
+    return (IS_COMMAND(frame->command) &&
+            ((role == LlRx && frame->address == TX_ADDR) ||
+             (role == LlTx && frame->address == RX_ADDR))) ||
+           (IS_RESPONSE(frame->command) &&
+            ((role == LlRx && frame->address == RX_ADDR) ||
+             (role == LlTx && frame->address == TX_ADDR)));
 }
 
-size_t read_frame(int fd, unsigned char *frame, unsigned char addr) {
+Frame *read_frame(int fd, LinkLayerRole role) {
     ReadFrameState state = START;
-    size_t i = 3;
+    Frame *frame = malloc(sizeof(Frame));
+    frame->information = NULL;
+    uint8_t temp;
 
     while (TRUE) {
         switch (state) {
         case START:
-            state = read_header_byte(fd, frame, FLAG, FLAG_RCV);
+            read(fd, &temp, 1);
+
+            if (temp == FLAG)
+                state = FLAG_RCV;
+
             break;
 
         case FLAG_RCV:
-            state = read_header_byte(fd, frame + 1, addr, A_RCV);
+            read(fd, &frame->address, 1);
+
+            if (frame->address == RX_ADDR || frame->address == TX_ADDR)
+                state = A_RCV;
+            else if (frame->address == FLAG)
+                state = FLAG_RCV;
+            else
+                state = START;
+
             break;
 
         case A_RCV:
-            read(fd, frame + 2, 1);
+            read(fd, &frame->command, 1);
 
-            if (frame[2] == FLAG)
+            if (check_command_and_address(frame, role))
+                state = C_RCV;
+            else if (frame->command == FLAG)
                 state = FLAG_RCV;
             else
-                state = C_RCV;
+                state = START;
 
             break;
 
         case C_RCV:
-            state = read_header_byte(fd, frame + 3,
-                                     make_BCC(frame[1], frame[2]), BCC_RCV);
+            read(fd, &temp, 1);
+
+            if (temp == (frame->address ^ frame->command))
+                state = BCC_RCV;
+            else if (temp == FLAG)
+                state = FLAG_RCV;
+            else
+                state = START;
+
             break;
 
         case BCC_RCV:
-            if ((frame[2] & 0xF) == I(0))
+            if ((frame->command & 0xF) == I(0)) {
                 state = DATA_RCV;
-            else
-                state = read_header_byte(fd, frame + (++i), FLAG, END);
+            } else {
+                read(fd, &temp, 1);
+
+                if (temp == FLAG)
+                    state = END;
+                else
+                    state = START;
+            }
             break;
 
         case DATA_RCV:
-            read(fd, frame + (++i), 1);
+            if (frame->information == NULL)
+                frame->information = bv_create();
 
-            if (frame[i] == ESC)
+            read(fd, &temp, 1);
+
+            if (temp == ESC)
                 state = ESC_RCV;
-            else if (frame[i] == FLAG)
+            else if (temp == FLAG)
                 state = END_FLAG_RCV;
+            else
+                bv_pushb(frame->information, temp);
 
             break;
 
-        case ESC_RCV: {
-            unsigned char temp;
+        case ESC_RCV:
             read(fd, &temp, 1);
             state = DATA_RCV;
 
             if (temp == ESC_ESC)
-                frame[i] = ESC;
+                bv_pushb(frame->information, ESC);
             else if (temp == ESC_FLAG)
-                frame[i] = FLAG;
+                bv_pushb(frame->information, FLAG);
             else
                 state = NACK;
 
             break;
-	}
+
         case NACK:
-            frame[2] |= I_ERR;
+            frame->command |= I_ERR;
             state = END;
             break;
 
-        case END_FLAG_RCV: {
-            unsigned char bcc2 = 0;
+        case END_FLAG_RCV:
+            uint8_t expected_bcc2 = 0;
+            uint8_t received_bcc2 = bv_popb(frame->information);
 
-            for (size_t j = 4; j <= i - 2; ++j)
-                bcc2 ^= frame[j];
+            for (size_t j = 0; j <= frame->information->length; ++j)
+                expected_bcc2 ^= bv_get(frame->information, j);
 
-            if (bcc2 != frame[i - 1])
+            if (expected_bcc2 != received_bcc2)
                 state = NACK;
             else
                 state = END;
             break;
-	}
-	default:
-            return i + 1;
+
+        default:
+            return frame;
         }
     }
 }
