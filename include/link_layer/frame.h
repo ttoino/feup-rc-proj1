@@ -11,6 +11,9 @@ typedef struct _Frame Frame;
 #include <stdint.h>
 #include <stdlib.h>
 
+#define BIT_B(b, n) ((b) << (n))
+#define BIT(n) BIT_B(1, n)
+
 /**
  * @brief The receiver's address.
  *
@@ -37,7 +40,7 @@ typedef struct _Frame Frame;
  *
  * Frames with this command have additional information.
  */
-#define I(s) (uint8_t)(((s) << 6) | 0b0000)
+#define I(s) (uint8_t)(BIT_B((s), 6) | 0b0000)
 /**
  * @brief Checks if a frame type is a command.
  */
@@ -54,13 +57,13 @@ typedef struct _Frame Frame;
  *
  * Used as a response to #I when no error was detected.
  */
-#define RR(r) (uint8_t)(((r) << 7) | 0b0101)
+#define RR(r) (uint8_t)(BIT_B((r), 7) | 0b0101)
 /**
  * @brief A rejection response.
  *
  * Used as a response to #I when an error was detected.
  */
-#define REJ(r) (uint8_t)(((r) << 7) | 0b0001)
+#define REJ(r) (uint8_t)(BIT_B((r), 7) | 0b0001)
 /**
  * @brief Checks if a frame type is a response.
  */

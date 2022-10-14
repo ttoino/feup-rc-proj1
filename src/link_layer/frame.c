@@ -1,6 +1,5 @@
 #include "link_layer/frame.h"
 #include "link_layer.h"
-#include "link_layer/common.h"
 #include "link_layer/timer.h"
 #include "log.h"
 
@@ -68,6 +67,10 @@ Frame *create_frame(LLConnection *connection, uint8_t cmd) {
     return frame;
 }
 
+uint8_t make_bcc(Frame *frame) {
+    return (uint8_t)(frame->address ^ frame->command);
+}
+
 /**
  * @brief Checks if a frame's address and command combination can be handled by
  *        this layer's role.
@@ -129,7 +132,7 @@ Frame *read_frame(LLConnection *connection) {
         case C_RCV:
             read(connection->fd, &temp, 1);
 
-            if (temp == (frame->address ^ frame->command))
+            if (temp == make_bcc(frame))
                 state = BCC_RCV;
             else if (temp == FLAG)
                 state = FLAG_RCV;
@@ -236,7 +239,7 @@ ssize_t write_frame(LLConnection *connection, Frame *frame) {
     bv_pushb(buf, FLAG);
     bv_pushb(buf, frame->address);
     bv_pushb(buf, frame->command);
-    bv_pushb(buf, frame->address ^ frame->command);
+    bv_pushb(buf, make_bcc(frame));
 
     if ((frame->command & 0xF) == I(0) && frame->information != NULL)
         write_info(buf, frame);

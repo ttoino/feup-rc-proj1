@@ -14,7 +14,6 @@
 #include <unistd.h>
 
 #include "link_layer.h"
-#include "link_layer/common.h"
 #include "link_layer/frame.h"
 #include "link_layer/timer.h"
 #include "log.h"
