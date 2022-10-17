@@ -187,7 +187,7 @@ Frame *read_frame(LLConnection *connection) {
             state = END;
             break;
 
-        case END_FLAG_RCV:
+        case END_FLAG_RCV: {
             uint8_t expected_bcc2 = 0;
             uint8_t received_bcc2 = bv_popb(frame->information);
 
@@ -199,6 +199,7 @@ Frame *read_frame(LLConnection *connection) {
             else
                 state = END;
             break;
+	}
 
         default:
             return frame;

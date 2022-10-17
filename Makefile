@@ -3,15 +3,15 @@
 
 # Parameters
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -lrt
 
 SRC = src/
 INCLUDE = include/
 BIN = bin/
 CABLE_DIR = cable/
 
-TX_SERIAL_PORT = /dev/ttyS10
-RX_SERIAL_PORT = /dev/ttyS11
+TX_SERIAL_PORT = /dev/ttyS0
+RX_SERIAL_PORT = /dev/ttyS0
 
 TX_FILE = penguin.gif
 RX_FILE = penguin-received.gif

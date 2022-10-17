@@ -1,6 +1,8 @@
 // Main file of the serial port project.
 // NOTE: This file must not be changed.
 
+#define _POSIX_SOURCE 1
+
 #include <stdio.h>
 #include <stdlib.h>
 
