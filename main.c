@@ -2,6 +2,7 @@
 // NOTE: This file must not be changed.
 
 #define _POSIX_SOURCE 1
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>

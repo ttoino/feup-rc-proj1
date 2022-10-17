@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "byte_vector.h"
 #include <memory.h>
 #include <stdlib.h>
