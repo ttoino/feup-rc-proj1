@@ -3,7 +3,8 @@
 
 # Parameters
 CC = gcc
-CFLAGS = -Wall -g -lrt
+# _DEBUG is used to include internal logging of errors and general information
+CFLAGS = -Wall -g -D_DEBUG
 
 SRC = src/
 INCLUDE = include/
@@ -13,15 +14,15 @@ CABLE_DIR = cable/
 TX_SERIAL_PORT = /dev/ttyS0
 RX_SERIAL_PORT = /dev/ttyS0
 
-TX_FILE = penguin.gif
-RX_FILE = penguin-received.gif
+TX_FILE = neuron.jpg
+RX_FILE = neuron-received.jpg
 
 # Targets
 .PHONY: all
 all: $(BIN)/main $(BIN)/cable
 
 $(BIN)/main: main.c $(SRC)/**/*.c $(SRC)/*.c
-	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE)
+	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
 $(BIN)/cable: $(CABLE_DIR)/cable.c
 	$(CC) $(CFLAGS) -o $@ $^

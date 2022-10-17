@@ -14,7 +14,7 @@
 enum packet_type { DATA = 1, START, END };
 
 /**
- * @brief Helper enum for
+ * @brief Helper enum for the field types in a START control packet
  *
  */
 enum control_packet_field_type { FILE_SIZE, FILE_NAME };

@@ -43,7 +43,7 @@ int setup_serial(LLConnection *this) {
     struct termios newtermios;
     memset(&newtermios, 0, sizeof(newtermios));
 
-    newtermios.c_cflag = B9600 | CS8 | CLOCAL | CREAD;
+    newtermios.c_cflag = B230400 | CS8 | CLOCAL | CREAD;
 
     newtermios.c_iflag = IGNPAR;
     newtermios.c_oflag = 0;
