@@ -21,19 +21,31 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-void handshake(LLConnection *this) {
+int handshake(LLConnection *this) {
     if (this->params.role == LL_TX) {
-        send_frame(this, create_frame(this, SET));
-        frame_destroy(expect_frame(this, UA));
+        if (send_frame(this, create_frame(this, SET)) == -1)
+            return -1;
+
+        Frame *f = expect_frame(this, UA);
+        if (f == NULL)
+            return -1;
+        frame_destroy(f);
 
         LOG("Handshake complete\n");
     }
+
+    return 0;
 }
 
 int setup_serial(LLConnection *this) {
     LOG("Setting up serial port connection...\n");
 
     this->fd = open(this->params.serial_port, O_RDWR | O_NOCTTY);
+
+    if (this->fd == -1) {
+        perror("llopen");
+        return -1;
+    }
 
     if (tcgetattr(this->fd, &this->old_termios) == -1) {
         perror("llopen");
@@ -52,7 +64,10 @@ int setup_serial(LLConnection *this) {
     newtermios.c_cc[VTIME] = 1;
     newtermios.c_cc[VMIN] = 1;
 
-    tcflush(this->fd, TCIOFLUSH);
+    if (tcflush(this->fd, TCIOFLUSH) == -1) {
+        perror("llopen");
+        return -1;
+    }
 
     if (tcsetattr(this->fd, TCSANOW, &newtermios) == -1) {
         perror("llopen");
@@ -64,20 +79,40 @@ int setup_serial(LLConnection *this) {
     return 1;
 }
 
+void connection_destroy(LLConnection *this) {
+    frame_destroy(this->last_command_frame);
+    tcsetattr(this->fd, TCSANOW, &this->old_termios);
+    close(this->fd);
+    timer_destroy(this);
+    free(this);
+}
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
 LLConnection *llopen(LLConnectionParams params) {
     LLConnection *this = malloc(sizeof(LLConnection));
+    this->last_command_frame = NULL;
 
     this->params = params;
 
-    timer_setup(this);
-
-    if (setup_serial(this) == -1)
+    if (setup_serial(this) == -1) {
+        connection_destroy(this);
+        free(this);
         return NULL;
+    }
 
-    handshake(this);
+    if (timer_setup(this) == -1) {
+        connection_destroy(this);
+        free(this);
+        return NULL;
+    }
+
+    if (handshake(this) == -1) {
+        connection_destroy(this);
+        free(this);
+        return NULL;
+    }
 
     return this;
 }
@@ -85,26 +120,39 @@ LLConnection *llopen(LLConnectionParams params) {
 ////////////////////////////////////////////////
 // LLWRITE
 ////////////////////////////////////////////////
-int llwrite(LLConnection *this, const unsigned char *buf, int bufSize) {
+ssize_t llwrite(LLConnection *this, const uint8_t *buf, size_t bufSize) {
+    if (this->closed)
+        return -1;
+
     LOG("Creating I frame!\n");
 
     Frame *frame = create_frame(this, I(this->tx_sequence_nr));
+
+    if (frame == NULL)
+        return -1;
+
     frame->information = bv_create();
     bv_push(frame->information, buf, bufSize);
 
-    LOG("Sending frame N(%d)\n", this->tx_sequence_nr);
+    LOG("Sending frame I(%d)\n", this->tx_sequence_nr);
 
     ssize_t bytes_written = send_frame(this, frame);
 
-    LOG("Sent frame N(%d)\n", this->tx_sequence_nr);
+    if (bytes_written == -1)
+        return -1;
+
+    LOG("Sent frame I(%d)\n", this->tx_sequence_nr);
 
     this->tx_sequence_nr = 1 - this->tx_sequence_nr;
 
-    LOG("Expecting ACK(%d)\n", this->tx_sequence_nr);
+    LOG("Expecting RR(%d)\n", this->tx_sequence_nr);
 
-    frame_destroy(expect_frame(this, RR(this->tx_sequence_nr)));
+    Frame *f = expect_frame(this, RR(this->tx_sequence_nr));
+    if (f == NULL)
+        return -1;
+    frame_destroy(f);
 
-    LOG("Received ACK(%d)\n", this->tx_sequence_nr);
+    LOG("Received RR(%d)\n", this->tx_sequence_nr);
 
     return bytes_written;
 }
@@ -112,7 +160,10 @@ int llwrite(LLConnection *this, const unsigned char *buf, int bufSize) {
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-int llread(LLConnection *this, uint8_t *packet) {
+ssize_t llread(LLConnection *this, uint8_t *packet) {
+    if (this->closed)
+        return -1;
+
     LOG("Waiting for I frame\n");
 
     Frame *frame = expect_frame(this, I(this->rx_sequence_nr));
@@ -135,23 +186,16 @@ int llread(LLConnection *this, uint8_t *packet) {
 // LLCLOSE
 ////////////////////////////////////////////////
 int llclose(LLConnection *this, bool showStatistics) {
-    if (this->params.role == LL_TX) {
-        send_frame(this, create_frame(this, DISC));
-        frame_destroy(expect_frame(this, DISC));
-    } else if (!this->closed) {
-        frame_destroy(expect_frame(this, DISC));
+    if (!this->closed) {
+        if (this->params.role == LL_TX) {
+            send_frame(this, create_frame(this, DISC));
+            frame_destroy(expect_frame(this, DISC));
+        } else {
+            frame_destroy(expect_frame(this, DISC));
+        }
     }
 
-    this->closed = true;
-
-    if (tcsetattr(this->fd, TCSANOW, &this->old_termios) == -1) {
-        perror("llclose");
-        exit(-1); // TODO: change to return
-    }
-
-    close(this->fd);
-
-    frame_destroy(this->last_command_frame);
+    connection_destroy(this);
 
     LOG("Closing serial port connection\n");
 

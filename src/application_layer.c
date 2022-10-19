@@ -53,7 +53,7 @@ Packet *create_control_packet(enum packet_type packet_type, size_t file_size,
                 sizeof(enum control_packet_field_type));
         bv_push(packet->information, (uint8_t *)&file_name_length,
                 sizeof(file_name_length));
-        bv_push(packet->information, (uint8_t *)&file_name, file_name_length);
+        bv_push(packet->information, (uint8_t *)file_name, file_name_length);
     }
 
     return packet;
@@ -81,23 +81,22 @@ int send_control_packet(LLConnection *connection, enum packet_type packet_type,
 /**
  * Fills in the packet header for the given packet
  */
-void fill_data_packet_header(Packet *packet, int fragment_size,
-                             int sequence_number) {
+void fill_data_packet_header(Packet *packet, uint16_t fragment_size,
+                             uint8_t sequence_number) {
     if (packet == NULL)
         return;
 
     if (packet->information == NULL)
         packet->information = bv_create();
 
-    bv_pushb(packet->information, (unsigned char)sequence_number);
-    bv_pushb(packet->information,
-             (unsigned char)((fragment_size & 0xFF00) >> 8));
-    bv_pushb(packet->information, (unsigned char)(fragment_size & 0xFF));
+    bv_pushb(packet->information, (uint8_t)sequence_number);
+    bv_pushb(packet->information, (uint8_t)((fragment_size & 0xFF00) >> 8));
+    bv_pushb(packet->information, (uint8_t)(fragment_size & 0xFF));
 }
 
-int send_data_packet(LLConnection *connection, unsigned char *buf, size_t len) {
+int send_data_packet(LLConnection *connection, uint8_t *buf, size_t len) {
     // TODO: maybe make this a Packet attribute
-    static unsigned char sequence_number = 0;
+    static uint8_t sequence_number = 0;
 
     Packet *packet = (Packet *)malloc(sizeof(Packet));
 
@@ -124,15 +123,10 @@ LLConnectionParams setupLLParams(const char *serial_port, const char *role,
                                  int baud_rate, int nTries, int timeout) {
     LLConnectionParams ll = {.baud_rate = baud_rate,
                              .n_retransmissions = nTries,
-                             .timeout = timeout};
+                             .timeout = timeout,
+                             .role = strcmp(role, "rx") == 0 ? LL_RX : LL_TX};
 
     strncpy(ll.serial_port, serial_port, sizeof(ll.serial_port) - 1);
-
-    LLRole r = LL_TX;
-    if (strcmp(role, "rx") == 0)
-        r = LL_RX;
-
-    ll.role = r;
 
     return ll;
 }
@@ -183,14 +177,22 @@ void applicationLayer(const char *serial_port, const char *role, int baud_rate,
 
     LLConnection *connection = connect(ll);
 
-    unsigned char packet_data[MAX_PAYLOAD_SIZE];
+    uint8_t packet_data[MAX_PAYLOAD_SIZE];
     if (ll.role == LL_RX) {
 
-        unsigned char *packet_ptr = NULL;
-        int fd;
+        uint8_t *packet_ptr = NULL;
+        int fd = -1;
+        uint8_t *file_name;
+        size_t file_size;
 
         while (true) {
             int bytes_read = llread(connection, packet_data);
+
+            if (bytes_read == -1) {
+                ERROR("Invalid read!\n");
+                break;
+            }
+
             packet_ptr = packet_data;
 
             LOG("Processing packet\n");
@@ -203,22 +205,33 @@ void applicationLayer(const char *serial_port, const char *role, int baud_rate,
             if (packet_type == END)
                 break;
             else if (packet_type == START) {
-                size_t filesize_length = *(size_t *)packet_ptr;
-                packet_ptr += sizeof(size_t);
 
-                // TODO: do something with filesize
-                size_t filesize = *(size_t *)packet_ptr;
-                packet_ptr += sizeof(size_t);
+                {
+                    packet_ptr += sizeof(enum control_packet_field_type);
 
-                size_t filename_length = *(size_t *)packet_ptr;
-                packet_ptr += sizeof(size_t);
+                    // size_t filesize_length = *(size_t *)packet_ptr;
+                    packet_ptr += sizeof(size_t);
 
-                // TODO: get filename
-                packet_ptr += filename_length;
+                    file_size = *(size_t *)packet_ptr;
+                    packet_ptr += sizeof(size_t);
+                }
 
-                LOG("Opening file descriptor for file: %s\n", filename);
+                {
+                    packet_ptr += sizeof(enum control_packet_field_type);
 
-                fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC);
+                    size_t filename_length = *(size_t *)packet_ptr;
+                    packet_ptr += sizeof(size_t);
+
+                    file_name = calloc(filename_length + strlen("_test") + 1,
+                                       sizeof(uint8_t));
+                    sprintf(file_name, "%.*s_test", filename_length,
+                            packet_ptr);
+                    packet_ptr += filename_length;
+                }
+
+                LOG("Opening file descriptor for file: %s\n", file_name);
+
+                fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
                 if (fd == -1) {
                     perror("opening RX fd");
@@ -226,30 +239,37 @@ void applicationLayer(const char *serial_port, const char *role, int baud_rate,
                 }
 
             } else if (packet_type == DATA) {
-                unsigned char sequence_number = *(unsigned char *)packet_ptr;
-                packet_ptr += sizeof(unsigned char);
+                uint8_t sequence_number = *(uint8_t *)packet_ptr;
+                packet_ptr += sizeof(uint8_t);
 
-                unsigned char fragment_size_h = *(unsigned char *)packet_ptr;
-                packet_ptr += sizeof(unsigned char);
-                unsigned char fragment_size_l = *(unsigned char *)packet_ptr;
-                packet_ptr += sizeof(unsigned char);
+                uint8_t fragment_size_h = *(uint8_t *)packet_ptr;
+                packet_ptr += sizeof(uint8_t);
+                uint8_t fragment_size_l = *(uint8_t *)packet_ptr;
+                packet_ptr += sizeof(uint8_t);
 
                 uint16_t fragment_size =
                     (fragment_size_h << 8) | fragment_size_l;
 
-                LOG("Writing %d bytes to %s\n", fragment_size, filename);
+                LOG("Writing %d bytes to %s\n", fragment_size, file_name);
 
-                if (write(fd, packet_ptr, fragment_size) == -1) {
+                ssize_t bytes_written = write(fd, packet_ptr, fragment_size);
+                static size_t total_bytes_written = 0;
+
+                if (bytes_written == -1) {
                     perror("writing to RX fd");
                     exit(-1);
+                } else if (bytes_written != 0) {
+                    total_bytes_written += bytes_written;
+
+                    INFO("Written %lf%% of the file\n",
+                         (double)(total_bytes_written * 100.0 / file_size));
                 }
             }
         }
-    } else {
 
-        if (init_transmission(connection, filename) == -1) {
-            exit(-1);
-        }
+        if (fd != -1)
+            close(fd);
+    } else {
 
         // TODO: Use ByteVector
 
@@ -259,25 +279,34 @@ void applicationLayer(const char *serial_port, const char *role, int baud_rate,
             exit(-1);
         }
 
+        if (init_transmission(connection, filename) == -1) {
+            exit(-1);
+        }
+
         while (true) {
             int bytes_read = read(fd, packet_data, MAX_PAYLOAD_SIZE);
 
             if (bytes_read == -1) {
                 perror("Error reading file fragment, aborting");
-                exit(-1);
+                break;
             } else if (bytes_read == 0) {
                 // reached end of file, send END packet
 
                 if (send_control_packet(connection, END, 0, "") == -1) {
                     ERROR("Error sending END control packet\n");
-                    exit(-1);
                 }
 
                 break;
             } else {
-                send_data_packet(connection, packet_data, bytes_read);
+                if (send_data_packet(connection, packet_data, bytes_read) ==
+                    -1) {
+                    ERROR("Error sending DATA packet\n");
+                    break;
+                };
             }
         }
+
+        close(fd);
     }
 
     llclose(connection, false);

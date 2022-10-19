@@ -30,7 +30,6 @@ ByteVector *bv_create() {
 }
 
 void bv_destroy(ByteVector *this) {
-
     if (this == NULL)
         return;
 

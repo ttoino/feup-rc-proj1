@@ -1,5 +1,6 @@
 \documentclass[11pt,a4paper]{article}
 
+\usepackage[margin=1in]{geometry}
 \usepackage{listings}
 \usepackage{color}
 
@@ -17,8 +18,7 @@
     commentstyle=\color{dkgreen},
     stringstyle=\color{mauve},
     breaklines=true,
-    breakatwhitespace=true,
-    frame=tb
+    breakatwhitespace=true
 }
 
 \title{RC Project}
@@ -47,6 +47,160 @@ TODO
 TODO
 
 \section{Code Structure}
+
+\subsection{Data Link Layer}
+
+The Data Link Layer is centered on the \textit{link\_layer.c} file and the \textit{link\_layer} folder.
+The \textit{link\_layer.c} file contains the protocol interface that can be used by upper layers, the \textit{link\_layer/timer.c} file contains code related to interfacing with POSIX timers, and the \textit{link\_layer/frame.c} file contains code to create and manipulate frames.
+
+\subsubsection{link\_layer.c}
+
+\begin{itemize}
+    \item \begin{lstlisting}
+typedef enum { LL_TX, LL_RX } LLRole;
+    \end{lstlisting}
+
+    Defines the role of a link layer connection.
+
+    \item \begin{lstlisting}
+typedef struct {
+    char serial_port[50];
+    LLRole role;
+    int baud_rate;
+    int n_retransmissions;
+    int timeout;
+} LLConnectionParams;
+    \end{lstlisting}
+
+    Defines the parameters required to create a new link layer connection.
+
+    \item \begin{lstlisting}
+struct _LLConnection {
+    LLConnectionParams params;
+    struct termios old_termios;
+    int fd;
+    bool closed;
+    uint8_t tx_sequence_nr;
+    uint8_t rx_sequence_nr;
+    int n_retransmissions_sent;
+    timer_t timer;
+    Frame *last_command_frame;
+};
+    \end{lstlisting}
+
+    Defines the state of a link layer connection.
+
+    \item \begin{lstlisting}
+LLConnection *llopen(LLConnectionParams params);
+    \end{lstlisting}
+
+    Opens a new link layer connection and returns it.
+
+    \item \begin{lstlisting}
+ssize_t llwrite(LLConnection *connection,
+    const uint8_t *buf, size_t buf_len);
+    \end{lstlisting}
+
+    Sends data through a connection.
+
+    \item \begin{lstlisting}
+ssize_t llread(LLConnection *connection, uint8_t *buf);
+    \end{lstlisting}
+
+    Reads data from a connection.
+
+    \item \begin{lstlisting}
+int llclose(LLConnection *connection, bool show_stats);
+    \end{lstlisting}
+
+    Closes a connection.
+\end{itemize}
+
+\subsubsection{link\_layer/timer.c}
+
+\begin{itemize}
+    \item \begin{lstlisting}
+void timer_setup(LLConnection *connection);
+    \end{lstlisting}
+
+    Sets up a connection's POSIX timer.
+
+    \item \begin{lstlisting}
+void timer_destroy(LLConnection *connection);
+    \end{lstlisting}
+
+    Deallocates a connection's POSIX timer.
+
+    \item \begin{lstlisting}
+void timer_arm(LLConnection *connection);
+    \end{lstlisting}
+
+    Starts a connection's POSIX timer.
+
+    \item \begin{lstlisting}
+void timer_disarm(LLConnection *connection);
+    \end{lstlisting}
+
+    Stops a connection's POSIX timer.
+
+    \item \begin{lstlisting}
+void timer_force(LLConnection *connection);
+    \end{lstlisting}
+
+    Forcibly calls a connection's timer handler.
+\end{itemize}
+
+\subsubsection{link\_layer/frame.c}
+
+\begin{itemize}
+    \item \begin{lstlisting}
+typedef struct {
+    uint8_t address;
+    uint8_t command;
+    ByteVector *information;
+} Frame;
+    \end{lstlisting}
+
+    Defines all the data needed to represent a frame.
+
+    \item \begin{lstlisting}
+Frame *create_frame(LLConnection *connection, uint8_t cmd);
+    \end{lstlisting}
+
+    Creates a new frame.
+
+    \item \begin{lstlisting}
+Frame *read_frame(LLConnection *connection);
+    \end{lstlisting}
+
+    Reads a frame from the connection's serial port.
+
+    \item \begin{lstlisting}
+ssize_t write_frame(LLConnection *connection, Frame *frame);
+    \end{lstlisting}
+
+    Writes a frame to the connection's serial port.
+
+    \item \begin{lstlisting}
+void frame_destroy(Frame *this);
+    \end{lstlisting}
+
+    Deallocates all memory allocated by a frame.
+
+    \item \begin{lstlisting}
+ssize_t send_frame(LLConnection *connection, Frame *frame);
+    \end{lstlisting}
+
+    Sends a frame to the connection's serial port and sets up retransmission if the frame is a command.
+
+    \item \begin{lstlisting}
+Frame *expect_frame(LLConnection *connection, uint8_t command);
+    \end{lstlisting}
+
+    Receives frames from a connection until a certain command is received.
+\end{itemize}
+
+\subsection{Application Layer}
 
 TODO
 
@@ -80,15 +234,7 @@ TODO
 
 \subsection{Code}
 
-In folder code/.
-
-\begin{lstlisting}
-#include <stdio.h>
-
-int main() {
-    printf("Hello world! %d\n", 129213);
-}
-\end{lstlisting}
+In folder \textit{code/}.
 
 \subsection{Figures}
 

@@ -1,5 +1,6 @@
 /**
- * THIS FILE DEFINES FUNCTIONS FOR INTERNAL LOGGING PURPOSES: THEY ARE NOT INTENDED TO BE USED BY CLIENT CODE
+ * THIS FILE DEFINES FUNCTIONS FOR INTERNAL LOGGING PURPOSES: THEY ARE NOT
+ * INTENDED TO BE USED BY CLIENT CODE
  *
  */
 #ifndef _LOG_H_
@@ -8,6 +9,7 @@
 #include <stdio.h>
 
 #ifdef _DEBUG
+
 /**
  * @brief Logs the given formatted message using the given prefix.
  *
@@ -29,15 +31,18 @@
  * Prints the formatted message with level ALARM
  */
 #define ALARM(...) _LOG("ALARM", __VA_ARGS__)
+
 #else
+
 #define LOG(...)
 #define INFO(...)
 #define ALARM(...)
+
 #endif
 
 /**
  * Prints the formatted message with level ERROR
  */
-#define ERROR(msg) fprintf(stderr, "[ERROR]: %s", msg)
+#define ERROR(...) fprintf(stderr, "[ERROR]: " __VA_ARGS__)
 
 #endif // _LOG_H_

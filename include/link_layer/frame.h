@@ -11,7 +11,13 @@ typedef struct _Frame Frame;
 #include <stdint.h>
 #include <stdlib.h>
 
+/**
+ * @brief Sets the n-th bit to b.
+ */
 #define BIT_B(b, n) ((b) << (n))
+/**
+ * @brief Sets the n-th bit to 1.
+ */
 #define BIT(n) BIT_B(1, n)
 
 /**
@@ -94,6 +100,9 @@ typedef struct _Frame Frame;
  */
 #define ESC_ESC (uint8_t)0x5d
 
+/**
+ * @brief A struct representing a frame.
+ */
 struct _Frame {
     /**
      * @brief This frame's address.
@@ -117,23 +126,29 @@ struct _Frame {
     ByteVector *information;
 };
 
+/**
+ * @brief Creates a frame.
+ *
+ * @param connection The connection that's creating the frame.
+ * @param cmd The command byte.
+ *
+ * @return The newly created frame.
+ */
 Frame *create_frame(LLConnection *connection, uint8_t cmd);
 
 /**
- * @brief Reads a frame from the specified file.
+ * @brief Reads a frame from a connection.
  *
- * @param fd The file descriptor to read from.
- * @param role This layer's role.
+ * @param connection The connection to read from.
  *
  * @return The frame that was read.
  */
 Frame *read_frame(LLConnection *connection);
 
 /**
- * @brief Write a frame onto the specified file.
+ * @brief Writes a frame onto a connection.
  *
- * @param frame The frame to write.
- * @param fd The file descriptor to write to.
+ * @param connection The connection to write to.
  *
  * @return The number of bytes written.
  * @return -1 on error.
@@ -147,8 +162,27 @@ ssize_t write_frame(LLConnection *connection, Frame *frame);
  */
 void frame_destroy(Frame *this);
 
+/**
+ * @brief Sends a frame through a connection.
+ *
+ * @note Equivalent to #write_frame for responses, automatically retransmits
+ *       commands.
+ *
+ * @param connection The connection to send through.
+ *
+ * @return The number of bytes written.
+ * @return -1 on error.
+ */
 ssize_t send_frame(LLConnection *connection, Frame *frame);
 
+/**
+ * @brief Reads frames continuously until a specified type is received.
+ *
+ * @param connection The connection to read from.
+ * @param command The command byte to expect.
+ *
+ * @return The frame that was read.
+ */
 Frame *expect_frame(LLConnection *connection, uint8_t command);
 
 #endif // _FRAME_H_
