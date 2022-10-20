@@ -46,7 +46,7 @@ void bv_destroy(ByteVector *vector);
  * @param buf The array to push.
  * @param buf_len The size of the array.
  */
-void bv_push(ByteVector *vector, uint8_t *buf, size_t buf_len);
+void bv_push(ByteVector *vector, const uint8_t *buf, size_t buf_len);
 /**
  * @brief Pushes a byte to the end of a vector.
  *

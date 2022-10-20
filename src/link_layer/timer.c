@@ -9,8 +9,6 @@ void timer_handler(union sigval val) {
 
     if (connection->n_retransmissions_sent ==
         connection->params.n_retransmissions) {
-        ERROR("Max retries achieved, endpoints are probably disconnected, "
-              "closing connection!\n");
         timer_disarm(connection);
         kill(getpid(), SIGCONT);
         return;
@@ -23,7 +21,10 @@ void timer_handler(union sigval val) {
     connection->n_retransmissions_sent++;
 }
 
-void a() { printf("SIGCONT\n"); }
+void a() {
+    ERROR("Max retries achieved, endpoints are probably disconnected, closing "
+          "connection!\n");
+}
 
 int timer_setup(LLConnection *connection) {
     struct sigevent event = {.sigev_notify = SIGEV_THREAD,

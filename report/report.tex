@@ -32,11 +32,11 @@
     TODO
 \end{abstract}
 
-\pagebreak
+% \pagebreak
 
-\tableofcontents
+% \tableofcontents
 
-\pagebreak
+% \pagebreak
 
 \section{Introduction}
 
@@ -44,7 +44,28 @@ TODO
 
 \section{Architecture}
 
-TODO
+\subsection{Layers}
+
+The code was divided into two distinct layers. This has the advantage of making the code more modular, reusable and versatile, as either layer could be swapped for another with a similar interface with minimal effort.
+
+\subsubsection{Data Link Layer}
+
+This is the lower level layer, it interfaces with the serial port driver directly. It is responsible for ensuring the data gets sent and received.
+
+\subsubsection{Application Layer}
+
+This is the higher level layer, it interfaces with the data link layer and with the file system. It is responsible for reading a file, breaking it up into chunks, sending these chunks through the data link layer, receiving these chunks, and assembling them back into a file.
+
+\subsection{Program Execution}
+
+The program can be executed by calling \lstinline{app serial_port role file_name}, where:
+
+\begin{itemize}
+    \item \lstinline{app} is the program executable;
+    \item \lstinline{serial_port} is the serial port file path;
+    \item \lstinline{role} is one of \lstinline{rx|tx}, for receiving or transmitting a file, respectively;
+    \item \lstinline{file_name} is the path of the file to be sent.
+\end{itemize}
 
 \section{Code Structure}
 
@@ -206,11 +227,28 @@ TODO
 
 \section{Main Use Cases}
 
+There are two main use cases: either sending a file or receiving a file.
+These use cases are described below.
+
+\subsection{Sending a file}
+
+TODO
+
+\subsection{Receiving a file}
+
 TODO
 
 \section{Link Layer Protocol}
 
-TODO
+The link layer protocol's flow is as follows: open a connection using llopen, send arbitrary data using llwrite, receive arbitrary data using llread, and close the connection using llclose. Each step's implementation is described below.
+
+\subsection{llopen}
+
+\subsection{llwrite}
+
+\subsection{llread}
+
+\subsection{llclose}
 
 \section{Application Layer Protocol}
 

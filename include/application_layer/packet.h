@@ -7,44 +7,22 @@
 #include "byte_vector.h"
 #include "link_layer.h"
 
-/**
- * @brief Represents the type of packet that is being sent
- *
- */
-enum packet_type { DATA = 1, START, END };
+#define LOG_NAME "APPLICATION LAYER"
 
-/**
- * @brief Helper enum for the field types in a START control packet
- *
- */
-enum control_packet_field_type { FILE_SIZE, FILE_NAME };
+#define PACKET_DATA_SIZE 1024
+#define PACKET_SIZE PACKET_DATA_SIZE + 4
 
-/**
- * @brief A struct representing a packet.
- */
-typedef struct {
+#define DATA_PACKET (uint8_t)1
+#define START_PACKET (uint8_t)2
+#define END_PACKET (uint8_t)3
 
-    /**
-     * @brief the type of this packet.
-     *
-     * This is separated for ease of use.
-     */
-    enum packet_type type;
+#define FILE_SIZE_FIELD (uint8_t)1
+#define FILE_NAME_FIELD (uint8_t)2
 
-    /**
-     * @brief Packet data. Contains all the bytes related to this packet,
-     * excluding the packet type.
-     *
-     * Can be null, see END control packets.
-     */
-    ByteVector *information;
-} Packet;
+ByteVector *create_start_packet(size_t file_size, const char *file_name);
+ByteVector *create_data_packet(const uint8_t *buf, uint16_t size);
+ByteVector *create_end_packet();
 
-/**
- * @brief Deallocates resources used for a packet.
- *
- * @param this the packet to deallocate
- */
-void packet_destroy(Packet *this);
+ssize_t send_packet(LLConnection *connection, ByteVector *packet);
 
 #endif // _PACKET_H_

@@ -5,6 +5,8 @@
 #include <termios.h>
 #include <time.h>
 
+#define LOG_NAME "LINK LAYER"
+
 /**
  * @brief An enum representing the role of a connection.
  */

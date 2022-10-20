@@ -37,7 +37,7 @@ void bv_destroy(ByteVector *this) {
     free(this);
 }
 
-void bv_push(ByteVector *this, uint8_t *buf, size_t buf_len) {
+void bv_push(ByteVector *this, const uint8_t *buf, size_t buf_len) {
     size_t i = this->length;
     this->length += buf_len;
     resize_if_needed(this);
