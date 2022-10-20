@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <unistd.h>
+#include <string.h>
 
 /**
  * @brief An enum representing the valid states in the state machine for reading
@@ -325,10 +326,11 @@ ssize_t send_frame(LLConnection *connection, Frame *frame) {
 }
 
 ssize_t handle_frame(LLConnection *connection, Frame *frame) {
-    LOG("Received frame (c = 0x%02x)\n", frame->command);
+    LOG("Received frame (c = %s, 0x%02x)\n", get_command(frame->command), frame->command);
 
     switch (frame->command) {
     case SET:
+        LOG("Sending UA frame to complete handshake!\n");
         return send_frame(connection, create_frame(connection, UA));
 
     case DISC:
@@ -343,6 +345,7 @@ ssize_t handle_frame(LLConnection *connection, Frame *frame) {
 
             frame_destroy(f);
         } else {
+            LOG("Sending UA frame to complete disconnect phase!\n");
             return send_frame(connection, create_frame(connection, UA));
         }
         break;
@@ -392,4 +395,42 @@ Frame *expect_frame(LLConnection *connection, uint8_t command) {
     }
 
     return frame;
+}
+
+char* get_command(uint8_t command) {
+    static char _command[7];
+
+    memset(_command, 0, 7);
+
+    switch (command) {
+        case SET:
+            sprintf(_command, "SET");
+            break;
+        case DISC:
+            sprintf(_command, "DISC");
+            break;
+        case I(0):
+            sprintf(_command, "I(0)");
+            break;
+        case I(1):
+            sprintf(_command, "I(1)");
+            break;
+        case UA:
+            sprintf(_command, "UA");
+            break;
+        case RR(0):
+            sprintf(_command, "RR(0)");
+            break;
+        case RR(1):
+            sprintf(_command, "RR(1)");
+            break;
+        case REJ(0):
+            sprintf(_command, "REJ(0)");
+            break;
+        case REJ(1):
+            sprintf(_command, "REJ(1)");
+            break;
+    }
+
+    return _command;
 }

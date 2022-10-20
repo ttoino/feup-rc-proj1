@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
+#include <signal.h>
 
 #include "byte_vector.h"
 #include "link_layer.h"
@@ -49,7 +51,7 @@ int init_transmission(LLConnection *connection, char *filename) {
     struct stat st;
 
     if (stat(filename, &st) != 0) {
-        perror("Could not determine size of file to transmit");
+        ERROR("Could not determine size of file to transmit: %s", strerror(errno));
         return -1;
     }
 
@@ -67,7 +69,7 @@ int init_transmission(LLConnection *connection, char *filename) {
 ssize_t receiver(LLConnection *connection) {
     uint8_t *packet_ptr = NULL;
     int fd = -1;
-    char file_name[256 + 9]; // Give space for "_received"
+    char file_name[256 + 9] = {0}; // Give space for "_received"
     size_t file_size = 0;
     uint8_t packet[PACKET_SIZE];
 
@@ -75,13 +77,16 @@ ssize_t receiver(LLConnection *connection) {
         ssize_t bytes_read = llread(connection, packet);
 
         if (bytes_read == -1) {
-            ERROR("Invalid read!\n");
+            ERROR("Error reading packet!\n");
             break;
         }
 
-        INFO("Received packet:");
+        INFO("Received packet");
+        #ifdef _PRINT_PACKET_DATA
+        printf(":");
         for (size_t i = 0; i < bytes_read; ++i)
             printf(" %02x", packet[i]);
+        #endif
         printf("\n");
 
         packet_ptr = packet;
@@ -103,23 +108,32 @@ ssize_t receiver(LLConnection *connection) {
                     for (uint8_t i = 0; i < size; ++i)
                         file_size += *packet_ptr++ << (8 * i);
                     break;
-                case FILE_NAME_FIELD:
-                    memcpy(&file_name, packet_ptr, size);
+                case FILE_NAME_FIELD: {
+
+                    char tmp_file_name[size + 1];
+                    memcpy(tmp_file_name, packet_ptr, size);
+                    tmp_file_name[size] = '\0';
+
+                    // split by the extension dot so that we can correctly construct the file name
+                    char* first_token = strtok(tmp_file_name, ".");
+                    char* second_token = strtok(NULL, ".");
+
+                    sprintf(file_name, "%s_received.%s", first_token, second_token);
+
                     packet_ptr += size;
                     break;
                 }
+                }
             }
 
-            INFO("Transferring file %s with size %lu\n", file_name, file_size);
-
-            sprintf(file_name + strlen(file_name), "_received");
+            INFO("Transferring file %s with size (in bytes) %lu\n", file_name, file_size);
 
             LOG("Opening file descriptor for file: %s\n", file_name);
 
             fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
             if (fd == -1) {
-                perror("opening RX fd");
+                ERROR("Opening RX fd: %s\n", strerror(errno));
                 exit(-1);
             }
 
@@ -136,7 +150,7 @@ ssize_t receiver(LLConnection *connection) {
             static size_t total_bytes_written = 0;
 
             if (bytes_written == -1) {
-                perror("writing to RX fd");
+                ERROR("Writing to RX fd: %s\n", strerror(errno));
                 exit(-1);
             } else if (bytes_written != 0) {
                 total_bytes_written += bytes_written;
@@ -191,12 +205,50 @@ ssize_t transmitter(LLConnection *connection, const char *filename) {
     close(fd);
 }
 
+LLConnection *connection = NULL;
+
+/**
+ * @brief Handles signals sent to this process in order to perform necessary cleanup if needed.
+ * 
+ * @param sig 
+ */
+void sig_handler(int sig) {
+    switch (sig) {
+        case SIGTERM:
+        case SIGINT:
+            if (connection != NULL) {
+                connection->closed = true;
+                llclose(connection, false);
+            }
+            break;
+    }
+}
+
+int setup_signal_handlers() {
+    struct sigaction sa;
+    
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = sig_handler;
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGINT, &sa, NULL) < 0 ||
+        sigaction(SIGTERM, &sa, NULL) < 0) {
+        return -1;
+    }
+}
+
 void applicationLayer(const char *serial_port, const char *role, int baud_rate,
                       int n_tries, int timeout, const char *filename) {
+
+    /* if (setup_signal_handlers() == -1) {
+        ERROR("Failed to setup signal handlers\n");
+        exit(-1);
+    } */
+
     LLConnectionParams ll =
         setupLLParams(serial_port, role, baud_rate, n_tries, timeout);
 
-    LLConnection *connection = connect(ll);
+    connection = connect(ll);
 
     if (connection == NULL) {
         ERROR("Error establishing connection.");

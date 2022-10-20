@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "link_layer.h"
 #include "link_layer/frame.h"
@@ -43,12 +44,12 @@ int setup_serial(LLConnection *this) {
     this->fd = open(this->params.serial_port, O_RDWR | O_NOCTTY);
 
     if (this->fd == -1) {
-        perror("llopen");
+        ERROR("llopen: %s\n", strerror(errno));
         return -1;
     }
 
     if (tcgetattr(this->fd, &this->old_termios) == -1) {
-        perror("llopen");
+        ERROR("llopen: %s\n", strerror(errno));
         return -1;
     }
 
@@ -65,12 +66,12 @@ int setup_serial(LLConnection *this) {
     newtermios.c_cc[VMIN] = 1;
 
     if (tcflush(this->fd, TCIOFLUSH) == -1) {
-        perror("llopen");
+        ERROR("llopen: %s\n", strerror(errno));
         return -1;
     }
 
     if (tcsetattr(this->fd, TCSANOW, &newtermios) == -1) {
-        perror("llopen");
+        ERROR("llopen: %s\n", strerror(errno));
         return -1;
     }
 
@@ -98,19 +99,16 @@ LLConnection *llopen(LLConnectionParams params) {
 
     if (setup_serial(this) == -1) {
         connection_destroy(this);
-        free(this);
         return NULL;
     }
 
     if (timer_setup(this) == -1) {
         connection_destroy(this);
-        free(this);
         return NULL;
     }
 
     if (handshake(this) == -1) {
         connection_destroy(this);
-        free(this);
         return NULL;
     }
 
@@ -141,8 +139,6 @@ ssize_t llwrite(LLConnection *this, const uint8_t *buf, size_t bufSize) {
     if (bytes_written == -1)
         return -1;
 
-    LOG("Sent frame I(%d)\n", this->tx_sequence_nr);
-
     this->tx_sequence_nr = 1 - this->tx_sequence_nr;
 
     LOG("Expecting RR(%d)\n", this->tx_sequence_nr);
@@ -151,8 +147,6 @@ ssize_t llwrite(LLConnection *this, const uint8_t *buf, size_t bufSize) {
     if (f == NULL)
         return -1;
     frame_destroy(f);
-
-    LOG("Received RR(%d)\n", this->tx_sequence_nr);
 
     return bytes_written;
 }
@@ -167,6 +161,15 @@ ssize_t llread(LLConnection *this, uint8_t *packet) {
     LOG("Waiting for I frame\n");
 
     Frame *frame = expect_frame(this, I(this->rx_sequence_nr));
+
+    // HACK
+    // FIXME: see if there is a better fix for this
+    // TODO: handle NULL frames
+    if (frame == NULL) {
+        /* ALARM("Error reading frame I(%d)\n", this->rx_sequence_nr);
+        return 0; */
+    }
+
     this->rx_sequence_nr = 1 - this->rx_sequence_nr;
 
     LOG("Reading I frame\n");
