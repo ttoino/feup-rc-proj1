@@ -1,6 +1,7 @@
 \documentclass[11pt,a4paper]{article}
 
 \usepackage[margin=1in]{geometry}
+\usepackage{indentfirst}
 \usepackage{listings}
 \usepackage{color}
 \usepackage{hyperref}
@@ -8,6 +9,11 @@
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
 \definecolor{mauve}{rgb}{0.58,0,0.82}
+\definecolor{orange}{rgb}{.7,.3,0}
+
+\makeatletter
+\lst@InstallKeywords k{types}{typestyle}\slshape{typestyle}{}ld
+\makeatother
 
 \lstset{
     language=c,
@@ -18,8 +24,13 @@
     keywordstyle=\color{blue},
     commentstyle=\color{dkgreen},
     stringstyle=\color{mauve},
+    typestyle=\color{orange},
     breaklines=true,
-    breakatwhitespace=true
+    breakatwhitespace=true,
+    moretypes={
+        LLConnection, LLConnectionParams, LLRole, Frame, ByteVector,
+        uint8_t, size_t, ssize_t, bool, termios, timer_t
+    }
 }
 
 \title{RC Project}
@@ -73,8 +84,8 @@ The program can be executed by calling \lstinline{app serial_port role file_name
 \subsection{Data Link Layer}
 \label{sec:dll}
 
-The Data Link Layer is centered on the \textit{link\_layer.c} file and the \textit{link\_layer} folder.
-The \textit{link\_layer.c} file contains the protocol interface that can be used by upper layers, the \textit{link\_layer/timer.c} file contains code related to interfacing with POSIX timers, and the \textit{link\_layer/frame.c} file contains code to create and manipulate frames.
+The Data Link Layer is centered on the \lstinline{link_layer.c} file and the \lstinline{link_layer} folder.
+The \lstinline{link_layer.c} file contains the protocol interface that can be used by upper layers, the \lstinline{timer.c} file contains code related to interfacing with POSIX timers, and the \lstinline{frame.c} file contains code to create and manipulate frames.
 
 \subsubsection{link\_layer.c}
 
@@ -225,9 +236,9 @@ Frame *expect_frame(LLConnection *connection, uint8_t command);
 
 \subsection{Application Layer}
 
-The Application Layer is centered around the \textit{application\_layer.c} file and the \textit{application\_layer} folder.
-The \textit{application\_layer.c} file contains the client facing interface of the application which is responsible for all the higher level setup and communication between transmitter and receiver.
-The \textit{application\_layer/packet.c} file contains code that is responsible for correctly creating control and data packets.
+The Application Layer is centered around the \lstinline{application_layer.c} file and the \lstinline{application_layer} folder.
+The \lstinline{application_layer.c} file contains the client facing interface of the application which is responsible for all the higher level setup and communication between transmitter and receiver.
+The \lstinline{packet.c} file contains code that is responsible for correctly creating control and data packets.
 
 \subsubsection{application\_layer.c}
 
@@ -236,7 +247,7 @@ The \textit{application\_layer/packet.c} file contains code that is responsible 
 LLConnectionParams setupLLParams(const char *serial_port, const char *role, int baud_rate, int nTries, int timeout);
     \end{lstlisting}
 
-    Compiles the parameters given to the application layer into a LLConnectionParams object to be used by the underlying \hyperref[sec:dll]{Data Link Layer}.
+    Compiles the parameters given to the application layer into an \lstinline{LLConnectionParams} object to be used by the underlying \hyperref[sec:dll]{Data Link Layer}.
 
     \item \begin{lstlisting}
 LLConnection *connect(LLConnectionParams ll);
@@ -308,15 +319,47 @@ TODO
 
 \section{Link Layer Protocol}
 
-The link layer protocol's flow is as follows: open a connection using llopen, send arbitrary data using llwrite, receive arbitrary data using llread, and close the connection using llclose. Each step's implementation is described below.
+The link layer protocol's flow is as follows: open a connection using \lstinline{llopen}, send arbitrary data using \lstinline{llwrite}, receive arbitrary data using \lstinline{llread}, and close the connection using \lstinline{llclose}.
+Each step's implementation is described below.
+
+This implementation uses an \lstinline{LLConnection} struct to save the state of a connection and in theory allows multiple serial port connections to be open in a single process.
+In practice this was not required or tested.
 
 \subsection{llopen}
 
+\begin{lstlisting}
+LLConnection *llopen(LLConnectionParams connectionParameters);
+\end{lstlisting}
+
+This function opens a connection to the serial port and creates a new Data Link Layer connection object.
+
+Firstly, this functions calls \lstinline{setup_serial} to setup the serial port connection, then it calls \lstinline{timer_setup} to setup a POSIX timer to handle timeouts when sending commands.
+Afterwards, the implementation differs depending on the role of a connection.
+
+From a transmitter's standpoint, a connection can only be considered \textbf{open} when a receiver is ready to receive data.
+As so, this function implements a syncing procedure and sends a \textit{SET} command, which must get a \textit{UA} response in return.
+If a response is not received, the command is resent a configurable amount of times, with an also configurable amount of time between them.
+
+On the other hand, a receiver's connection can be considered open immediately, which means this syncing procedure is not handled by this function.
+
 \subsection{llwrite}
+
+\begin{lstlisting}
+ssize_t llwrite(LLConnection *connection, 
+    const uint8_t *buf, size_t buf_len);
+\end{lstlisting}
 
 \subsection{llread}
 
+\begin{lstlisting}
+ssize_t llread(LLConnection *connection, uint8_t *buf);
+\end{lstlisting}
+
 \subsection{llclose}
+
+\begin{lstlisting}
+int llclose(LLConnection *connection, bool show_stats);
+\end{lstlisting}
 
 \section{Application Layer Protocol}
 
@@ -340,7 +383,7 @@ TODO
 
 \subsection{Code}
 
-In folder \textit{code/}.
+\noindent In folder \lstinline{code/}.
 
 \subsection{Figures}
 
