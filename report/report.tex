@@ -3,6 +3,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{listings}
 \usepackage{color}
+\usepackage{hyperref}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -70,6 +71,7 @@ The program can be executed by calling \lstinline{app serial_port role file_name
 \section{Code Structure}
 
 \subsection{Data Link Layer}
+\label{sec:dll}
 
 The Data Link Layer is centered on the \textit{link\_layer.c} file and the \textit{link\_layer} folder.
 The \textit{link\_layer.c} file contains the protocol interface that can be used by upper layers, the \textit{link\_layer/timer.c} file contains code related to interfacing with POSIX timers, and the \textit{link\_layer/frame.c} file contains code to create and manipulate frames.
@@ -223,7 +225,73 @@ Frame *expect_frame(LLConnection *connection, uint8_t command);
 
 \subsection{Application Layer}
 
-TODO
+The Application Layer is centered around the \textit{application\_layer.c} file and the \textit{application\_layer} folder.
+The \textit{application\_layer.c} file contains the client facing interface of the application which is responsible for all the higher level setup and communication between transmitter and receiver.
+The \textit{application\_layer/packet.c} file contains code that is responsible for correctly creating control and data packets.
+
+\subsubsection{application\_layer.c}
+
+\begin{itemize}
+    \item \begin{lstlisting}
+LLConnectionParams setupLLParams(const char *serial_port, const char *role, int baud_rate, int nTries, int timeout);
+    \end{lstlisting}
+
+    Compiles the parameters given to the application layer into a LLConnectionParams object to be used by the underlying \hyperref[sec:dll]{Data Link Layer}.
+
+    \item \begin{lstlisting}
+LLConnection *connect(LLConnectionParams ll);
+    \end{lstlisting}
+
+    Opens a connection to one of the computer's serial ports.
+
+    \item \begin{lstlisting}
+int init_transmission(LLConnection *connection, char *filename);
+    \end{lstlisting}
+
+    Starts the communication process between transmitter and receiver.
+
+    \item \begin{lstlisting}
+ssize_t receiver(LLConnection *connection);
+    \end{lstlisting}
+
+    Executes the receiver's operational flow.
+
+    \item \begin{lstlisting}
+ssize_t receiver(LLConnection *connection);
+    \end{lstlisting}
+        
+    Executes the transmitter's operational flow.
+
+    \item \begin{lstlisting}
+void sig_handler(int sig);
+    \end{lstlisting}
+
+    Handles OS signals. Currently unused.
+
+    \item \begin{lstlisting}
+int setup_signal_handlers();
+    \end{lstlisting}
+
+    Installs signal handlers for the various interceptable signals that might terminate the program in order to perform any necessary cleanup.
+
+    \item \begin{lstlisting}
+void applicationLayer(const char *serial_port, const char *role, int baud_rate, int n_tries, int timeout, const char *filename);
+    \end{lstlisting}
+
+    Entrypoint for the application layer.
+
+\end{itemize}
+
+\subsubsection{application\_layer/packet.c}
+
+\begin{itemize}
+    \item \begin{lstlisting}
+ByteVector *create_start_packet(size_t file_size, const char *file_name);
+    \end{lstlisting}
+
+    Creates a \textbf{START} packet containing the transmitted file's size and name.
+
+\end{itemize}
 
 \section{Main Use Cases}
 
