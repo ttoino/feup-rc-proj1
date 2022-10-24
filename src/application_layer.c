@@ -18,7 +18,7 @@
 #include "application_layer.h"
 #include "application_layer/packet.h"
 
-LLConnection *connect(char *serial_port, LLRole role) {
+LLConnection *connect(const char *serial_port, LLRole role) {
     LOG("Connecting to %s\n", serial_port);
 
     LLConnection *connection = llopen(serial_port, role);
@@ -36,7 +36,7 @@ LLConnection *connect(char *serial_port, LLRole role) {
     return connection;
 }
 
-int init_transmission(LLConnection *connection, char *filename) {
+int init_transmission(LLConnection *connection, const char *filename) {
     struct stat st;
 
     if (stat(filename, &st) != 0) {
@@ -131,8 +131,16 @@ ssize_t receiver(LLConnection *connection) {
             }
 
         } else if (packet_type == DATA_PACKET) {
-            uint8_t sequence_number = *packet_ptr++;
-            uint8_t fragment_size_h = *packet_ptr++;
+
+	    static uint8_t acc_sequence_number = 0;
+            uint8_t rcv_sequence_number = *packet_ptr++;
+            
+	    if (acc_sequence_number++ != rcv_sequence_number) {
+		ERROR("Critical: Received incorrect packet (expected=%d, actual=%d), aborting!\n", acc_sequence_number, rcv_sequence_number);
+		return -1;
+	    }
+
+	    uint8_t fragment_size_h = *packet_ptr++;
             uint8_t fragment_size_l = *packet_ptr++;
 
             uint16_t fragment_size = (fragment_size_h << 8) | fragment_size_l;
@@ -156,6 +164,8 @@ ssize_t receiver(LLConnection *connection) {
 
     if (fd != -1)
         close(fd);
+
+    return 1;
 }
 
 ssize_t transmitter(LLConnection *connection, const char *filename) {
@@ -196,6 +206,8 @@ ssize_t transmitter(LLConnection *connection, const char *filename) {
     }
 
     close(fd);
+
+   return 1;
 }
 
 void application_layer(const char *serial_port, const char *role,

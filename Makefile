@@ -5,7 +5,7 @@
 # Parameters
 CC = gcc
 
-C = 9600
+C = 19200
 DEBUG_LEVEL=3
 FER = 0
 T_PROP = 0
@@ -20,8 +20,8 @@ INCLUDE = include/
 BIN = bin/
 CABLE_DIR = cable/
 
-TX_SERIAL_PORT = /dev/ttyS10
-RX_SERIAL_PORT = /dev/ttyS11
+TX_SERIAL_PORT = /dev/ttyS0
+RX_SERIAL_PORT = /dev/ttyS0
 
 TX_FILE = neuron.jpg
 RX_FILE = neuron-received.jpg

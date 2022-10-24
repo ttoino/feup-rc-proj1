@@ -17,7 +17,8 @@
 #ifndef C
 #define C 9600
 #endif
-#define BAUDRATE B##C
+#define JOIN(a, b) a##b
+#define BAUDRATE(c) JOIN(B, c)
 #ifndef N_TRIES
 #define N_TRIES 3
 #endif
@@ -29,11 +30,6 @@
  * @brief An enum representing the role of a connection.
  */
 typedef enum _LLRole LLRole;
-
-/**
- * @brief A struct representing the parameters required to setup a connection.
- */
-typedef struct _LLConnectionParams LLConnectionParams;
 
 /**
  * @brief A struct representing a connection and its state.
@@ -112,7 +108,7 @@ struct _LLConnection {
  * @return The newly opened connection.
  * @return NULL on error.
  */
-LLConnection *llopen(char *serial_port, LLRole role);
+LLConnection *llopen(const char *serial_port, LLRole role);
 
 /**
  * @brief Send data through a connection.

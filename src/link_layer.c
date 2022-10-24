@@ -38,7 +38,7 @@ int handshake(LLConnection *this) {
     return 0;
 }
 
-int setup_serial(LLConnection *this, char *serial_port) {
+int setup_serial(LLConnection *this, const char *serial_port) {
     LOG("Setting up serial port connection...\n");
 
     this->fd = open(serial_port, O_RDWR | O_NOCTTY);
@@ -56,7 +56,7 @@ int setup_serial(LLConnection *this, char *serial_port) {
     struct termios newtermios;
     memset(&newtermios, 0, sizeof(newtermios));
 
-    newtermios.c_cflag = B230400 | CS8 | CLOCAL | CREAD;
+    newtermios.c_cflag = BAUDRATE(C) | CS8 | CLOCAL | CREAD;
 
     newtermios.c_iflag = IGNPAR;
     newtermios.c_oflag = 0;
@@ -91,7 +91,7 @@ void connection_destroy(LLConnection *this) {
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
-LLConnection *llopen(char *serial_port, LLRole role) {
+LLConnection *llopen(const char *serial_port, LLRole role) {
     LLConnection *this = malloc(sizeof(LLConnection));
     this->last_command_frame = NULL;
 
