@@ -6,6 +6,9 @@
 \usepackage{color}
 \usepackage{hyperref}
 \usepackage[super]{nth}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\pgfplotsset{compat=1.18}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -416,6 +419,7 @@ TODO
 TODO
 
 \pagebreak
+\onecolumn
 \appendix
 \section{Appendix}
 
@@ -425,6 +429,195 @@ TODO
 
 \subsection{Figures}
 
-TODO
+\pgfkeys{/pgf/number format/.cd,fixed,precision=4}
+\pgfplotstableset{
+    every head row/.style={before row=\hline},
+    every last row/.style={after row=\hline},
+    every column/.style={column type/.add={|}{}},
+    every first column/.style={column type/.add={|}{}},
+    every last column/.style={column type/.add={}{||}},
+}
+
+\begin{table}[h!]
+    \centering
+    \pgfplotstabletypeset[
+        columns/C/.style={column name={Baud rate}},
+        columns/FS/.style={column name={File size}},
+        columns/PS/.style={column name={Packet size}},
+        every first row/.style={
+                before row={
+                        \textit{bit/s} &
+                        \textit{bit} &
+                        \textit{byte} \\
+                        \hline \hline}
+            }
+    ]{defaults.tsv}
+    \caption{Default values}
+\end{table}
+
+\begin{table}[h!]
+    \centering
+    \pgfplotstabletypeset[
+        columns/C/.style={column name={Baud rate}},
+        columns/t1/.style={column name={$t_1$}},
+        columns/t2/.style={column name={$t_2$}},
+        columns/t/.style={column name={$t_{mean}$}},
+        columns/R/.style={column name={Flow}},
+        columns/S/.style={column name={Efficiency}},
+        every first row/.style={
+                before row={
+                        \textit{bit/s} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{bit/s} &
+                        \\
+                        \hline \hline}
+            }
+    ]{c.tsv}
+    \caption{Efficiency for a varied baud rate}
+\end{table}
+
+\begin{center}
+    \begin{tikzpicture}
+        \begin{axis}[
+                title={Efficiency as baud rate increases},
+                xlabel={Baud rate (\textit{bit/s})},
+                xmin=0, xmax=120000,
+                ylabel={Efficiency},
+                ymin=0.7, ymax=0.8
+            ]
+            \addplot[
+                color=blue,
+                mark=square
+            ] table[x=C, y=S] {c.tsv};
+            \legend{S(FER, a)}
+        \end{axis}
+    \end{tikzpicture}
+\end{center}
+
+\begin{table}[h!]
+    \centering
+    \pgfplotstabletypeset[
+        columns/FER/.style={column name={Frame error ratio}},
+        columns/t1/.style={column name={$t_1$}},
+        columns/t2/.style={column name={$t_2$}},
+        columns/t/.style={column name={$t_{mean}$}},
+        columns/R/.style={column name={Flow}},
+        columns/S/.style={column name={Efficiency}},
+        every first row/.style={
+                before row={
+                        &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{bit/s} &
+                        \\
+                        \hline \hline}
+            }
+    ]{fer.tsv}
+    \caption{Efficiency for a varied frame error ratio}
+\end{table}
+
+\begin{center}
+    \begin{tikzpicture}
+        \begin{axis}[
+                title={Efficiency as frame error ratio increases},
+                xlabel={Frame error ratio},
+                xmin=0, xmax=.2,
+                ylabel={Efficiency},
+                ymin=0, ymax=1
+            ]
+            \addplot[
+                color=blue,
+                mark=square
+            ] table[x=FER, y=S] {fer.tsv};
+            \legend{S(FER, a)}
+        \end{axis}
+    \end{tikzpicture}
+\end{center}
+
+\begin{table}[h!]
+    \centering
+    \pgfplotstabletypeset[
+        columns/d/.style={column name={Cable length}},
+        columns/t1/.style={column name={$t_1$}},
+        columns/t2/.style={column name={$t_2$}},
+        columns/t/.style={column name={$t_{mean}$}},
+        columns/R/.style={column name={Flow}},
+        columns/S/.style={column name={Efficiency}},
+        every first row/.style={
+                before row={
+                        \textit{km} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{bit/s} &
+                        \\
+                        \hline \hline}
+            }
+    ]{tprop.tsv}
+    \caption{Efficiency for a varied cable length}
+\end{table}
+
+\begin{center}
+    \begin{tikzpicture}
+        \begin{axis}[
+                title={Efficiency as cable length increases},
+                xlabel={Cable length (\textit{km})},
+                xmin=0, xmax=10000,
+                ylabel={Efficiency},
+                ymin=0.4, ymax=0.8
+            ]
+            \addplot[
+                color=blue,
+                mark=square
+            ] table[x=d, y=S] {tprop.tsv};
+            \legend{S(FER, a)}
+        \end{axis}
+    \end{tikzpicture}
+\end{center}
+
+\begin{table}[h!]
+    \centering
+    \pgfplotstabletypeset[
+        columns/PS/.style={column name={Packet size}},
+        columns/t1/.style={column name={$t_1$}},
+        columns/t2/.style={column name={$t_2$}},
+        columns/t/.style={column name={$t_{mean}$}},
+        columns/R/.style={column name={Flow}},
+        columns/S/.style={column name={Efficiency}},
+        every first row/.style={
+                before row={
+                        \textit{byte} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{s} &
+                        \textit{bit/s} &
+                        \\
+                        \hline \hline}
+            }
+    ]{size.tsv}
+    \caption{Efficiency for a varied packet size}
+\end{table}
+
+\begin{center}
+    \begin{tikzpicture}
+        \begin{axis}[
+                title={Efficiency as packet size increases},
+                xlabel={Packet size (\textit{byte})},
+                xmin=0, xmax=4096, xtick distance=1024,
+                ylabel={Efficiency},
+                ymin=0.3, ymax=0.8,
+                legend pos=south east
+            ]
+            \addplot[
+                color=blue,
+                mark=square
+            ] table[x=PS, y=S] {size.tsv};
+            \legend{S(FER, a)}
+        \end{axis}
+    \end{tikzpicture}
+\end{center}
 
 \end{document}
