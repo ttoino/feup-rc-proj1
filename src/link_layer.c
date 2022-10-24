@@ -2,6 +2,7 @@
 
 #define _GNU_SOURCE
 
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
@@ -12,7 +13,6 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "link_layer.h"
 #include "link_layer/frame.h"
@@ -162,13 +162,8 @@ ssize_t llread(LLConnection *this, uint8_t *packet) {
 
     Frame *frame = expect_frame(this, I(this->rx_sequence_nr));
 
-    // HACK
-    // FIXME: see if there is a better fix for this
-    // TODO: handle NULL frames
-    if (frame == NULL) {
-        /* ALARM("Error reading frame I(%d)\n", this->rx_sequence_nr);
-        return 0; */
-    }
+    if (frame == NULL)
+        return -1;
 
     this->rx_sequence_nr = 1 - this->rx_sequence_nr;
 

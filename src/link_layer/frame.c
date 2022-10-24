@@ -4,8 +4,8 @@
 #include "log.h"
 
 #include <stdbool.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 
 /**
  * @brief An enum representing the valid states in the state machine for reading
@@ -326,7 +326,8 @@ ssize_t send_frame(LLConnection *connection, Frame *frame) {
 }
 
 ssize_t handle_frame(LLConnection *connection, Frame *frame) {
-    LOG("Received frame (c = %s, 0x%02x)\n", get_command(frame->command), frame->command);
+    LOG("Received frame (c = %s, 0x%02x)\n", get_command(frame->command),
+        frame->command);
 
     switch (frame->command) {
     case SET:
@@ -397,40 +398,31 @@ Frame *expect_frame(LLConnection *connection, uint8_t command) {
     return frame;
 }
 
-char* get_command(uint8_t command) {
-    static char _command[7];
-
-    memset(_command, 0, 7);
-
+char *get_command(uint8_t command) {
     switch (command) {
-        case SET:
-            sprintf(_command, "SET");
-            break;
-        case DISC:
-            sprintf(_command, "DISC");
-            break;
-        case I(0):
-            sprintf(_command, "I(0)");
-            break;
-        case I(1):
-            sprintf(_command, "I(1)");
-            break;
-        case UA:
-            sprintf(_command, "UA");
-            break;
-        case RR(0):
-            sprintf(_command, "RR(0)");
-            break;
-        case RR(1):
-            sprintf(_command, "RR(1)");
-            break;
-        case REJ(0):
-            sprintf(_command, "REJ(0)");
-            break;
-        case REJ(1):
-            sprintf(_command, "REJ(1)");
-            break;
+    case SET:
+        return "SET";
+    case DISC:
+        return "DISC";
+    case I(0):
+        return "I(0)";
+    case I(1):
+        return "I(1)";
+    case UA:
+        return "UA";
+    case RR(0):
+        return "RR(0)";
+    case RR(1):
+        return "RR(1)";
+    case REJ(0):
+        return "REJ(0)";
+    case REJ(1):
+        return "REJ(1)";
+    case I(0) | I_ERR:
+        return "I_ERR(0)";
+    case I(1) | I_ERR:
+        return "I_ERR(1)";
     }
 
-    return _command;
+    return "INVALID";
 }

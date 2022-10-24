@@ -1,14 +1,14 @@
 // Application layer protocol implementation
 
+#include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <errno.h>
-#include <signal.h>
 
 #include "byte_vector.h"
 #include "link_layer.h"
@@ -51,7 +51,8 @@ int init_transmission(LLConnection *connection, char *filename) {
     struct stat st;
 
     if (stat(filename, &st) != 0) {
-        ERROR("Could not determine size of file to transmit: %s", strerror(errno));
+        ERROR("Could not determine size of file to transmit: %s",
+              strerror(errno));
         return -1;
     }
 
@@ -82,11 +83,11 @@ ssize_t receiver(LLConnection *connection) {
         }
 
         INFO("Received packet");
-        #ifdef _PRINT_PACKET_DATA
+#ifdef _PRINT_PACKET_DATA
         printf(":");
         for (size_t i = 0; i < bytes_read; ++i)
             printf(" %02x", packet[i]);
-        #endif
+#endif
         printf("\n");
 
         packet_ptr = packet;
@@ -114,11 +115,13 @@ ssize_t receiver(LLConnection *connection) {
                     memcpy(tmp_file_name, packet_ptr, size);
                     tmp_file_name[size] = '\0';
 
-                    // split by the extension dot so that we can correctly construct the file name
-                    char* first_token = strtok(tmp_file_name, ".");
-                    char* second_token = strtok(NULL, ".");
+                    // split by the extension dot so that we can correctly
+                    // construct the file name
+                    char *first_token = strtok(tmp_file_name, ".");
+                    char *second_token = strtok(NULL, ".");
 
-                    sprintf(file_name, "%s_received.%s", first_token, second_token);
+                    sprintf(file_name, "%s_received.%s", first_token,
+                            second_token);
 
                     packet_ptr += size;
                     break;
@@ -126,7 +129,8 @@ ssize_t receiver(LLConnection *connection) {
                 }
             }
 
-            INFO("Transferring file %s with size (in bytes) %lu\n", file_name, file_size);
+            INFO("Transferring file %s with size (in bytes) %lu\n", file_name,
+                 file_size);
 
             LOG("Opening file descriptor for file: %s\n", file_name);
 
@@ -205,50 +209,12 @@ ssize_t transmitter(LLConnection *connection, const char *filename) {
     close(fd);
 }
 
-LLConnection *connection = NULL;
-
-/**
- * @brief Handles signals sent to this process in order to perform necessary cleanup if needed.
- * 
- * @param sig 
- */
-void sig_handler(int sig) {
-    switch (sig) {
-        case SIGTERM:
-        case SIGINT:
-            if (connection != NULL) {
-                connection->closed = true;
-                llclose(connection, false);
-            }
-            break;
-    }
-}
-
-int setup_signal_handlers() {
-    struct sigaction sa;
-    
-    sigemptyset(&sa.sa_mask);
-    sa.sa_handler = sig_handler;
-    sa.sa_flags = 0;
-
-    if (sigaction(SIGINT, &sa, NULL) < 0 ||
-        sigaction(SIGTERM, &sa, NULL) < 0) {
-        return -1;
-    }
-}
-
 void applicationLayer(const char *serial_port, const char *role, int baud_rate,
                       int n_tries, int timeout, const char *filename) {
-
-    /* if (setup_signal_handlers() == -1) {
-        ERROR("Failed to setup signal handlers\n");
-        exit(-1);
-    } */
-
     LLConnectionParams ll =
         setupLLParams(serial_port, role, baud_rate, n_tries, timeout);
 
-    connection = connect(ll);
+    LLConnection *connection = connect(ll);
 
     if (connection == NULL) {
         ERROR("Error establishing connection.");

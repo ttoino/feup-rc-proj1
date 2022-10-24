@@ -187,10 +187,11 @@ Frame *expect_frame(LLConnection *connection, uint8_t command);
 
 /**
  * @brief Construct the textual representation of the given command.
- * 
- * @param command the command to convert into a human-readable string
- * @return the human-readable string representation of the given command
+ *
+ * @param command The command to convert into a human-readable string.
+ *
+ * @return The human-readable string representation of the given command.
  */
-char* get_command(uint8_t command);
+char *get_command(uint8_t command);
 
 #endif // _FRAME_H_

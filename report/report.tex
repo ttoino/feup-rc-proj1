@@ -1,10 +1,11 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[11pt,a4paper,twocolumn]{article}
 
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=.75in]{geometry}
 \usepackage{indentfirst}
 \usepackage{listings}
 \usepackage{color}
 \usepackage{hyperref}
+\usepackage[super]{nth}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -33,16 +34,16 @@
     }
 }
 
-\title{RC Project}
+\title{RC - \nth{1} Project}
 \author{João Pereira, Nuno Pereira}
 
 \begin{document}
-    
+
 \maketitle
 
-\begin{abstract}
-    TODO
-\end{abstract}
+% \begin{abstract}
+%     TODO
+% \end{abstract}
 
 % \pagebreak
 
@@ -52,7 +53,7 @@
 
 \section{Introduction}
 
-TODO
+The objective of this project was to develop a simple data link layer and an application to test the effectiveness of this layer.
 
 \section{Architecture}
 
@@ -94,7 +95,7 @@ The \lstinline{link_layer.c} file contains the protocol interface that can be us
 typedef enum { LL_TX, LL_RX } LLRole;
     \end{lstlisting}
 
-    Defines the role of a link layer connection.
+          Defines the role of a link layer connection.
 
     \item \begin{lstlisting}
 typedef struct {
@@ -106,7 +107,7 @@ typedef struct {
 } LLConnectionParams;
     \end{lstlisting}
 
-    Defines the parameters required to create a new link layer connection.
+          Defines the parameters required to create a new link layer connection.
 
     \item \begin{lstlisting}
 struct _LLConnection {
@@ -122,66 +123,79 @@ struct _LLConnection {
 };
     \end{lstlisting}
 
-    Defines the state of a link layer connection.
+          Defines the state of a link layer connection.
 
     \item \begin{lstlisting}
-LLConnection *llopen(LLConnectionParams params);
+LLConnection *llopen(
+    LLConnectionParams params);
     \end{lstlisting}
 
-    Opens a new link layer connection and returns it.
+          Opens a new link layer connection and returns it.
 
     \item \begin{lstlisting}
-ssize_t llwrite(LLConnection *connection,
-    const uint8_t *buf, size_t buf_len);
+ssize_t llwrite(
+    LLConnection *connection,
+    const uint8_t *buf,
+    size_t buf_len);
     \end{lstlisting}
 
-    Sends data through a connection.
+          Sends data through a connection.
 
     \item \begin{lstlisting}
-ssize_t llread(LLConnection *connection, uint8_t *buf);
+ssize_t llread(
+    LLConnection *connection, 
+    uint8_t *buf);
     \end{lstlisting}
 
-    Reads data from a connection.
+          Reads data from a connection.
 
     \item \begin{lstlisting}
-int llclose(LLConnection *connection, bool show_stats);
+int llclose(
+    LLConnection *connection, 
+    bool show_stats);
     \end{lstlisting}
 
-    Closes a connection.
+          Closes a connection.
 \end{itemize}
 
 \subsubsection{link\_layer/timer.c}
 
 \begin{itemize}
     \item \begin{lstlisting}
-void timer_setup(LLConnection *connection);
+void timer_setup(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Sets up a connection's POSIX timer.
+          Sets up a connection's POSIX timer.
 
     \item \begin{lstlisting}
-void timer_destroy(LLConnection *connection);
+void timer_destroy(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Deallocates a connection's POSIX timer.
+          Deallocates a connection's POSIX timer.
 
     \item \begin{lstlisting}
-void timer_arm(LLConnection *connection);
+void timer_arm(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Starts a connection's POSIX timer.
+          Starts a connection's POSIX timer.
 
     \item \begin{lstlisting}
-void timer_disarm(LLConnection *connection);
+void timer_disarm(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Stops a connection's POSIX timer.
+          Stops a connection's POSIX timer.
 
     \item \begin{lstlisting}
-void timer_force(LLConnection *connection);
+void timer_force(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Forcibly calls a connection's timer handler.
+          Forcibly calls a connection's timer handler.
+
 \end{itemize}
 
 \subsubsection{link\_layer/frame.c}
@@ -195,43 +209,53 @@ typedef struct {
 } Frame;
     \end{lstlisting}
 
-    Defines all the data needed to represent a frame.
+          Defines all the data needed to represent a frame.
 
     \item \begin{lstlisting}
-Frame *create_frame(LLConnection *connection, uint8_t cmd);
+Frame *create_frame(
+    LLConnection *connection, 
+    uint8_t cmd);
     \end{lstlisting}
 
-    Creates a new frame.
+          Creates a new frame.
 
     \item \begin{lstlisting}
-Frame *read_frame(LLConnection *connection);
+Frame *read_frame(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Reads a frame from the connection's serial port.
+          Reads a frame from the connection's serial port.
 
     \item \begin{lstlisting}
-ssize_t write_frame(LLConnection *connection, Frame *frame);
+ssize_t write_frame(
+    LLConnection *connection, 
+    Frame *frame);
     \end{lstlisting}
 
-    Writes a frame to the connection's serial port.
+          Writes a frame to the connection's serial port.
 
     \item \begin{lstlisting}
 void frame_destroy(Frame *this);
     \end{lstlisting}
 
-    Deallocates all memory allocated by a frame.
+          Deallocates all memory allocated by a frame.
 
     \item \begin{lstlisting}
-ssize_t send_frame(LLConnection *connection, Frame *frame);
+ssize_t send_frame(
+    LLConnection *connection, 
+    Frame *frame);
     \end{lstlisting}
 
-    Sends a frame to the connection's serial port and sets up retransmission if the frame is a command.
+          Sends a frame to the connection's serial port and sets up retransmission if the frame is a command.
 
     \item \begin{lstlisting}
-Frame *expect_frame(LLConnection *connection, uint8_t command);
+Frame *expect_frame(
+    LLConnection *connection, 
+    uint8_t command);
     \end{lstlisting}
 
-    Receives frames from a connection until a certain command is received.
+          Receives frames from a connection until a certain command is received.
+
 \end{itemize}
 
 \subsection{Application Layer}
@@ -244,52 +268,57 @@ The \lstinline{packet.c} file contains code that is responsible for correctly cr
 
 \begin{itemize}
     \item \begin{lstlisting}
-LLConnectionParams setupLLParams(const char *serial_port, const char *role, int baud_rate, int nTries, int timeout);
+LLConnectionParams setupLLParams(
+    const char *serial_port, 
+    const char *role, 
+    int baud_rate, 
+    int nTries, 
+    int timeout);
     \end{lstlisting}
 
-    Compiles the parameters given to the application layer into an \lstinline{LLConnectionParams} object to be used by the underlying \hyperref[sec:dll]{Data Link Layer}.
+          Compiles the parameters given to the application layer into an \lstinline{LLConnectionParams} object to be used by the underlying \hyperref[sec:dll]{Data Link Layer}.
 
     \item \begin{lstlisting}
-LLConnection *connect(LLConnectionParams ll);
+LLConnection *connect(
+    LLConnectionParams ll);
     \end{lstlisting}
 
-    Opens a connection to one of the computer's serial ports.
+          Opens a connection to one of the computer's serial ports.
 
     \item \begin{lstlisting}
-int init_transmission(LLConnection *connection, char *filename);
+int init_transmission(
+    LLConnection *connection, 
+    char *filename);
     \end{lstlisting}
 
-    Starts the communication process between transmitter and receiver.
+          Starts the communication process between transmitter and receiver.
 
     \item \begin{lstlisting}
-ssize_t receiver(LLConnection *connection);
+ssize_t receiver(
+    LLConnection *connection);
     \end{lstlisting}
 
-    Executes the receiver's operational flow.
+          Executes the receiver's operational flow.
 
     \item \begin{lstlisting}
-ssize_t receiver(LLConnection *connection);
+ssize_t transmitter(
+    LLConnection *connection, 
+    const char *filename);
     \end{lstlisting}
-        
-    Executes the transmitter's operational flow.
+
+          Executes the transmitter's operational flow.
 
     \item \begin{lstlisting}
-void sig_handler(int sig);
+void applicationLayer(
+    const char *serial_port, 
+    const char *role, 
+    int baud_rate, 
+    int n_tries, 
+    int timeout, 
+    const char *filename);
     \end{lstlisting}
 
-    Handles OS signals. Currently unused.
-
-    \item \begin{lstlisting}
-int setup_signal_handlers();
-    \end{lstlisting}
-
-    Installs signal handlers for the various interceptable signals that might terminate the program in order to perform any necessary cleanup.
-
-    \item \begin{lstlisting}
-void applicationLayer(const char *serial_port, const char *role, int baud_rate, int n_tries, int timeout, const char *filename);
-    \end{lstlisting}
-
-    Entrypoint for the application layer.
+          Entrypoint for the application layer.
 
 \end{itemize}
 
@@ -297,10 +326,12 @@ void applicationLayer(const char *serial_port, const char *role, int baud_rate, 
 
 \begin{itemize}
     \item \begin{lstlisting}
-ByteVector *create_start_packet(size_t file_size, const char *file_name);
+ByteVector *create_start_packet(
+    size_t file_size, 
+    const char *file_name);
     \end{lstlisting}
 
-    Creates a \textbf{START} packet containing the transmitted file's size and name.
+          Creates a \textbf{START} packet containing the transmitted file's size and name.
 
 \end{itemize}
 
@@ -328,7 +359,8 @@ In practice this was not required or tested.
 \subsection{llopen}
 
 \begin{lstlisting}
-LLConnection *llopen(LLConnectionParams connectionParameters);
+LLConnection *llopen(
+    LLConnectionParams params);
 \end{lstlisting}
 
 This function opens a connection to the serial port and creates a new Data Link Layer connection object.
@@ -345,20 +377,26 @@ On the other hand, a receiver's connection can be considered open immediately, w
 \subsection{llwrite}
 
 \begin{lstlisting}
-ssize_t llwrite(LLConnection *connection, 
-    const uint8_t *buf, size_t buf_len);
+ssize_t llwrite(
+    LLConnection *connection, 
+    const uint8_t *buf, 
+    size_t buf_len);
 \end{lstlisting}
 
 \subsection{llread}
 
 \begin{lstlisting}
-ssize_t llread(LLConnection *connection, uint8_t *buf);
+ssize_t llread(
+    LLConnection *connection, 
+    uint8_t *buf);
 \end{lstlisting}
 
 \subsection{llclose}
 
 \begin{lstlisting}
-int llclose(LLConnection *connection, bool show_stats);
+int llclose(
+    LLConnection *connection, 
+    bool show_stats);
 \end{lstlisting}
 
 \section{Application Layer Protocol}
