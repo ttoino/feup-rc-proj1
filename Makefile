@@ -4,9 +4,16 @@
 
 # Parameters
 CC = gcc
+
+C = 9600
+DEBUG_LEVEL=3
+FER = 0
+T_PROP = 0
+PACKET_SIZE = 1024
+
 # _DEBUG is used to include internal logging of errors and general information. Levels go from 1 to 3, highest to lowest priority respectively
 # _PRINT_PACKET_DATA is used to print the packet data that is received by RX
-CFLAGS = -Wall -g -D_DEBUG=3
+CFLAGS = -Wall -g -D _DEBUG=$(DEBUG_LEVEL) -D C=$(C) -D FER=$(FER) -D T_PROP=$(T_PROP) -D PACKET_DATA_SIZE=$(PACKET_SIZE)
 
 SRC = src/
 INCLUDE = include/

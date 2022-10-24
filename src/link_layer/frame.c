@@ -61,11 +61,10 @@ Frame *create_frame(LLConnection *connection, uint8_t cmd) {
     if (frame == NULL)
         return NULL;
 
-    frame->address =
-        (IS_COMMAND(cmd) && connection->params.role == LL_RX) ||
-                (IS_RESPONSE(cmd) && connection->params.role == LL_TX)
-            ? RX_ADDR
-            : TX_ADDR;
+    frame->address = (IS_COMMAND(cmd) && connection->role == LL_RX) ||
+                             (IS_RESPONSE(cmd) && connection->role == LL_TX)
+                         ? RX_ADDR
+                         : TX_ADDR;
     frame->command = cmd;
 
     return frame;
@@ -137,7 +136,7 @@ Frame *read_frame(LLConnection *connection) {
                 return NULL;
             }
 
-            if (check_command_and_address(frame, connection->params.role))
+            if (check_command_and_address(frame, connection->role))
                 state = C_RCV;
             else if (frame->command == FLAG)
                 state = FLAG_RCV;
@@ -336,7 +335,7 @@ ssize_t handle_frame(LLConnection *connection, Frame *frame) {
 
     case DISC:
         connection->closed = true;
-        if (connection->params.role == LL_RX) {
+        if (connection->role == LL_RX) {
             if (send_frame(connection, create_frame(connection, DISC)) == -1)
                 return -1;
 

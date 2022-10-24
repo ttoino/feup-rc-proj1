@@ -7,8 +7,7 @@
 void timer_handler(union sigval val) {
     LLConnection *connection = val.sival_ptr;
 
-    if (connection->n_retransmissions_sent ==
-        connection->params.n_retransmissions) {
+    if (connection->n_retransmissions_sent == N_TRIES) {
         timer_disarm(connection);
         kill(getpid(), SIGCONT);
         return;
@@ -45,9 +44,8 @@ int timer_destroy(LLConnection *connection) {
 }
 
 int timer_arm(LLConnection *connection) {
-    struct itimerspec ts = {
-        .it_value = {.tv_sec = connection->params.timeout, .tv_nsec = 0},
-        .it_interval = {.tv_sec = connection->params.timeout, .tv_nsec = 0}};
+    struct itimerspec ts = {.it_value = {.tv_sec = TIMEOUT, .tv_nsec = 0},
+                            .it_interval = {.tv_sec = TIMEOUT, .tv_nsec = 0}};
 
     return timer_settime(connection->timer, 0, &ts, 0);
 }

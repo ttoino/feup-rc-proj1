@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "byte_vector.h"
@@ -17,30 +18,18 @@
 #include "application_layer.h"
 #include "application_layer/packet.h"
 
-LLConnectionParams setupLLParams(const char *serial_port, const char *role,
-                                 int baud_rate, int nTries, int timeout) {
-    LLConnectionParams ll = {.baud_rate = baud_rate,
-                             .n_retransmissions = nTries,
-                             .timeout = timeout,
-                             .role = strcmp(role, "rx") == 0 ? LL_RX : LL_TX};
+LLConnection *connect(char *serial_port, LLRole role) {
+    LOG("Connecting to %s\n", serial_port);
 
-    strncpy(ll.serial_port, serial_port, sizeof(ll.serial_port) - 1);
-
-    return ll;
-}
-
-LLConnection *connect(LLConnectionParams ll) {
-    LOG("Connecting to %s\n", ll.serial_port);
-
-    LLConnection *connection = llopen(ll);
+    LLConnection *connection = llopen(serial_port, role);
 
     if (connection == NULL) {
         ERROR("Serial connection on port %s not available, aborting\n",
-              ll.serial_port);
+              serial_port);
         exit(-1);
     }
 
-    if (ll.role == LL_TX) {
+    if (role == LL_TX) {
         LOG("Connection established\n");
     }
 
@@ -87,8 +76,8 @@ ssize_t receiver(LLConnection *connection) {
         printf(":");
         for (size_t i = 0; i < bytes_read; ++i)
             printf(" %02x", packet[i]);
-#endif
         printf("\n");
+#endif
 
         packet_ptr = packet;
 
@@ -209,22 +198,31 @@ ssize_t transmitter(LLConnection *connection, const char *filename) {
     close(fd);
 }
 
-void applicationLayer(const char *serial_port, const char *role, int baud_rate,
-                      int n_tries, int timeout, const char *filename) {
-    LLConnectionParams ll =
-        setupLLParams(serial_port, role, baud_rate, n_tries, timeout);
+void application_layer(const char *serial_port, const char *role,
+                       const char *filename) {
+    LLRole llrole = strcmp(role, "rx") == 0 ? LL_RX : LL_TX;
+    LLConnection *connection = connect(serial_port, llrole);
 
-    LLConnection *connection = connect(ll);
+    struct timespec start, end, diff;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     if (connection == NULL) {
         ERROR("Error establishing connection.");
     }
 
-    if (ll.role == LL_RX) {
+    if (llrole == LL_RX) {
         receiver(connection);
     } else {
         transmitter(connection, filename);
     }
 
-    llclose(connection, false);
+    llclose(connection);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    diff.tv_sec = end.tv_sec - start.tv_sec;
+    diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+
+    INFO("Took %01lu.%09lu to send/receive the file!\n", diff.tv_sec,
+         diff.tv_nsec);
 }

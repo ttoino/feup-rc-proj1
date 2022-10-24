@@ -9,7 +9,9 @@
 
 #define LOG_NAME "APPLICATION LAYER"
 
+#ifndef PACKET_DATA_SIZE
 #define PACKET_DATA_SIZE 1024
+#endif
 #define PACKET_SIZE PACKET_DATA_SIZE + 4
 
 #define DATA_PACKET (uint8_t)1

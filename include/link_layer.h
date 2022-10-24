@@ -7,6 +7,23 @@
 
 #define LOG_NAME "LINK LAYER"
 
+#ifndef FER
+#define FER 0
+#endif
+#ifndef T_PROP
+#define T_PROP 0
+#endif
+#ifndef C
+#define C 9600
+#endif
+#define BAUDRATE B##C
+#ifndef N_TRIES
+#define N_TRIES 3
+#endif
+#ifndef TIMEOUT
+#define TIMEOUT 4
+#endif
+
 /**
  * @brief An enum representing the role of a connection.
  */
@@ -39,24 +56,13 @@ enum _LLRole {
 };
 
 /**
- * @brief A struct representing the parameters required to setup a connection.
- */
-struct _LLConnectionParams {
-    char serial_port[50];
-    LLRole role;
-    int baud_rate;
-    int n_retransmissions;
-    int timeout;
-};
-
-/**
  * @brief A struct representing a connection and its state.
  */
 struct _LLConnection {
     /**
-     * @brief The parameters used to setup this connection.
+     * @brief The role of this connection.
      */
-    LLConnectionParams params;
+    LLRole role;
 
     /**
      * @brief The serial port config present before the connection was setup.
@@ -105,7 +111,7 @@ struct _LLConnection {
  * @return The newly opened connection.
  * @return NULL on error.
  */
-LLConnection *llopen(LLConnectionParams connectionParameters);
+LLConnection *llopen(char *serial_port, LLRole role);
 
 /**
  * @brief Send data through a connection.
@@ -139,6 +145,6 @@ ssize_t llread(LLConnection *connection, uint8_t *buf);
  * @return 1 on success.
  * @return Negative on error
  */
-int llclose(LLConnection *connection, bool show_stats);
+int llclose(LLConnection *connection);
 
 #endif // _LINK_LAYER_H_

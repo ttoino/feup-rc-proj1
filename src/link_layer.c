@@ -23,7 +23,7 @@
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
 int handshake(LLConnection *this) {
-    if (this->params.role == LL_TX) {
+    if (this->role == LL_TX) {
         if (send_frame(this, create_frame(this, SET)) == -1)
             return -1;
 
@@ -38,10 +38,10 @@ int handshake(LLConnection *this) {
     return 0;
 }
 
-int setup_serial(LLConnection *this) {
+int setup_serial(LLConnection *this, char *serial_port) {
     LOG("Setting up serial port connection...\n");
 
-    this->fd = open(this->params.serial_port, O_RDWR | O_NOCTTY);
+    this->fd = open(serial_port, O_RDWR | O_NOCTTY);
 
     if (this->fd == -1) {
         ERROR("llopen: %s\n", strerror(errno));
@@ -91,13 +91,13 @@ void connection_destroy(LLConnection *this) {
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
-LLConnection *llopen(LLConnectionParams params) {
+LLConnection *llopen(char *serial_port, LLRole role) {
     LLConnection *this = malloc(sizeof(LLConnection));
     this->last_command_frame = NULL;
 
-    this->params = params;
+    this->role = role;
 
-    if (setup_serial(this) == -1) {
+    if (setup_serial(this, serial_port) == -1) {
         connection_destroy(this);
         return NULL;
     }
@@ -183,9 +183,9 @@ ssize_t llread(LLConnection *this, uint8_t *packet) {
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(LLConnection *this, bool showStatistics) {
+int llclose(LLConnection *this) {
     if (!this->closed) {
-        if (this->params.role == LL_TX) {
+        if (this->role == LL_TX) {
             send_frame(this, create_frame(this, DISC));
             frame_destroy(expect_frame(this, DISC));
         } else {
