@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /**
@@ -92,6 +93,8 @@ bool check_command_and_address(Frame *frame, LLRole role) {
              (role == LL_TX && frame->address == TX_ADDR)));
 }
 
+double rand_double() { return (double)rand() / (double)RAND_MAX; }
+
 Frame *read_frame(LLConnection *connection) {
     ReadFrameState state = START;
     Frame *frame = malloc(sizeof(Frame));
@@ -151,7 +154,7 @@ Frame *read_frame(LLConnection *connection) {
                 return NULL;
             }
 
-            if (temp == make_bcc(frame))
+            if (temp == make_bcc(frame) && rand_double() >= FER)
                 state = BCC_RCV;
             else if (temp == FLAG)
                 state = FLAG_RCV;
@@ -220,6 +223,9 @@ Frame *read_frame(LLConnection *connection) {
             uint8_t expected_bcc2 = 0;
             uint8_t received_bcc2 = bv_popb(frame->information);
 
+            if (rand_double() < FER)
+                received_bcc2 ^= 1;
+
             for (size_t j = 0; j <= frame->information->length; ++j)
                 expected_bcc2 ^= bv_get(frame->information, j);
 
@@ -231,6 +237,7 @@ Frame *read_frame(LLConnection *connection) {
         }
 
         default:
+            usleep(T_PROP);
             return frame;
         }
     }
