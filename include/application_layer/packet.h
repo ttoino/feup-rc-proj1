@@ -7,6 +7,7 @@
 #include "byte_vector.h"
 #include "link_layer.h"
 
+#undef LOG_NAME
 #define LOG_NAME "APPLICATION LAYER"
 
 #ifndef PACKET_DATA_SIZE

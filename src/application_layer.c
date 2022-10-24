@@ -203,7 +203,7 @@ void application_layer(const char *serial_port, const char *role,
     LLRole llrole = strcmp(role, "rx") == 0 ? LL_RX : LL_TX;
     LLConnection *connection = connect(serial_port, llrole);
 
-    struct timespec start, end, diff;
+    struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     if (connection == NULL) {
@@ -220,9 +220,8 @@ void application_layer(const char *serial_port, const char *role,
 
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-    diff.tv_sec = end.tv_sec - start.tv_sec;
-    diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+    uint64_t diff = (end.tv_nsec - start.tv_nsec) +
+                    (end.tv_sec - start.tv_sec) * 1000000000;
 
-    INFO("Took %01lu.%09lu to send/receive the file!\n", diff.tv_sec,
-         diff.tv_nsec);
+    INFO("Took %luns to send/receive the file!\n", diff);
 }

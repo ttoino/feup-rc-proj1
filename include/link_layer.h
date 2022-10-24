@@ -5,6 +5,7 @@
 #include <termios.h>
 #include <time.h>
 
+#undef LOG_NAME
 #define LOG_NAME "LINK LAYER"
 
 #ifndef FER
