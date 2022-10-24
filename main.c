@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "application_layer.h"
 
@@ -22,6 +23,8 @@ int main(int argc, char *argv[]) {
     const char *serial_port = argv[1];
     const char *role = argv[2];
     const char *filename = argv[3];
+
+    srand(time(NULL));
 
     application_layer(serial_port, role, filename);
 

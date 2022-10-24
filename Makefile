@@ -5,9 +5,9 @@
 # Parameters
 CC = gcc
 
-C = 19200
+C = 57600
 DEBUG_LEVEL=3
-FER = 0
+FER = 0.02
 T_PROP = 0
 PACKET_SIZE = 1024
 
