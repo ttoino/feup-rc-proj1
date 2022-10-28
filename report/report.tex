@@ -6,6 +6,7 @@
 \usepackage{color}
 \usepackage{hyperref}
 \usepackage[super]{nth}
+\usepackage{siunitx}
 \usepackage{pgfplots}
 \usepackage{pgfplotstable}
 \pgfplotsset{compat=1.18}
@@ -446,13 +447,37 @@ TODO
 The application was tested in several circumstances:
 
 \begin{itemize}
-    \item Using different files: penguin.gif (10,968 B), neuron.jpg (31,802 B), test (9,594,624 B);
+    \item Using different files: penguin.gif (\qty{10968}{\byte}), neuron.jpg (\qty{31802}{\byte}), test (\qty{9594624}{\byte});
     \item With temporary disconnects;
     \item With interference;
-    \item Using different baud rates: 
+    \item Using different baud rates: \qtylist{9600;19200;38400;57600;115200}{baud};
+    \item Using different packet sizes: \qtylist{16;32;64;128;256;512;1024;2048;4096}{\byte};
+    \item Using different cable lengths (simulated in software using the benchmark of \qty[per-mode=symbol]{5}{\micro\second\per\kilo\metre}): \qtylist{0;1;5;10;50;100;500;1000;5000;10000}{\kilo\metre}
 \end{itemize}
 
+All tests were successful.
+The received file's integrity was verified visually and by using \lstinline{diff}.
+
 \section{Link Layer Efficiency}
+
+The data link layer efficiency was tested mainly by varying a few parameters, namely the connection capacity, the frame error ratio (simulated), the cable length (simulated), and the packet size.
+All of these tests are in \href{sec:a2}{Appendix 2}.
+
+\subsection{Varying the Connection Capacity}
+
+Varying the connection capacity resulted in an almost constant efficiency function (a slightly downwards slope linear function).
+
+This makes sense from a theoretical standpoint, as the efficiency is calculated by dividing the real flow by the connection capacity, and the real flow is directly proportional to the connection capacity.
+
+\subsection{Varying the Frame Error Ratio}
+
+TODO
+
+\subsection{Varying the Cable Length}
+
+TODO
+
+\subsection{Varying the Packet Size}
 
 TODO
 
@@ -460,7 +485,6 @@ TODO
 
 TODO
 
-\pagebreak
 \onecolumn
 \appendix
 \section{Appendix}
@@ -470,6 +494,7 @@ TODO
 \noindent In folder \lstinline{code/}.
 
 \subsection{Figures}
+\label{sec:a2}
 
 \pgfkeys{/pgf/number format/.cd,fixed,precision=4}
 \pgfplotstableset{
@@ -533,7 +558,7 @@ TODO
                 color=blue,
                 mark=square
             ] table[x=C, y=S] {c.tsv};
-            \legend{S(FER, a)}
+            \legend{S(FER; a)}
         \end{axis}
     \end{tikzpicture}
 \end{center}
@@ -574,7 +599,7 @@ TODO
                 color=blue,
                 mark=square
             ] table[x=FER, y=S] {fer.tsv};
-            \legend{S(FER, a)}
+            \legend{S(FER; a)}
         \end{axis}
     \end{tikzpicture}
 \end{center}
@@ -615,7 +640,7 @@ TODO
                 color=blue,
                 mark=square
             ] table[x=d, y=S] {tprop.tsv};
-            \legend{S(FER, a)}
+            \legend{S(FER; a)}
         \end{axis}
     \end{tikzpicture}
 \end{center}
@@ -643,6 +668,7 @@ TODO
     \caption{Efficiency for a varied packet size}
 \end{table}
 
+\pgfkeys{/pgf/number format/.cd,fixed,precision=0}
 \begin{center}
     \begin{tikzpicture}
         \begin{axis}[
@@ -657,7 +683,7 @@ TODO
                 color=blue,
                 mark=square
             ] table[x=PS, y=S] {size.tsv};
-            \legend{S(FER, a)}
+            \legend{S(FER; a)}
         \end{axis}
     \end{tikzpicture}
 \end{center}
