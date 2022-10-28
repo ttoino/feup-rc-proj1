@@ -440,6 +440,39 @@ identify the file being transmitted,
 read chunks of the file and send them through the \hyperref[sec:dll]{Data Link Layer},
 signal the end of the transmission.
 
+\subsection{connect}
+
+\begin{lstlisting}
+LLConnection *connect(const char *serial_port, LLRole role)
+\end{lstlisting}
+
+This function is basically a wrapper around \lstinline{llopen} that catches errors in the establishment of the connection.
+
+\subsection{init\_transmission}
+
+\begin{lstlisting}
+int init_transmission(LLConnection *connection, const char *filename)
+\end{lstlisting}
+
+This functions is responsible for signaling the beginning of the file transmission process to the receiver. This also catches any errors that happened in the transmission of the \textit{START} packet.
+First we \textbf{stat} the file to be transmitted in order to get its size. Then a \textit{START} packet is constructed and sent to the receiver system. Finally we return 1 on success or -1 on failure.
+
+\subsection{receiver}
+
+\begin{lstlisting}
+ssize_t receiver(LLConnection *connection)
+\end{lstlisting}
+
+This function handles the \textit{receiver} logic of the application layer.
+
+\subsection{transmitter}
+
+\begin{lstlisting}
+ssize_t transmitter(LLConnection *connection, const char *filename)
+\end{lstlisting}
+
+This function handles the \textit{transmitter} logic of the application layer.
+
 \section{Validation}
 
 The application was tested in several circumstances:
@@ -469,15 +502,21 @@ This makes sense from a theoretical standpoint, as the efficiency is calculated 
 
 \subsection{Varying the Frame Error Ratio}
 
-TODO
+Varying the frame error ratio resulted in a steep decline in efficiency as the FER increases. This can be due to the fact that in our tests, when we wanted to fall inside the "signal error" area, we outright reject an entire frame, which requires us to wait for \textit{timeout} seconds before re-transmitting the previous frame.
 
 \subsection{Varying the Cable Length}
 
-TODO
+Varying the cable length resulted in a near-linear decrease in transmission efficiency.
+
+This makes sense because the transmission speed of data packets/frames is constant throughout the cable, so the efficiency is proportional to the length.
+
+FIXME: mudar isto
 
 \subsection{Varying the Packet Size}
 
-TODO
+Varying the packet size resulted in a functions that is close to \textit{(-1/x) + 1}, showing that the optimal packet size is between 1024 and 2048: any values bigger do not incur any performance gain.
+
+FIXME: mudar isto
 
 \section{Conclusions}
 
