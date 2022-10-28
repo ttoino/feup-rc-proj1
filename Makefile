@@ -7,9 +7,9 @@ CC = gcc
 
 C = 57600
 DEBUG_LEVEL=3
-FER = 0.02
+FER = 0
 T_PROP = 0
-PACKET_SIZE = 1024
+PACKET_SIZE = 4096
 
 # _DEBUG is used to include internal logging of errors and general information. Levels go from 1 to 3, highest to lowest priority respectively
 # _PRINT_PACKET_DATA is used to print the packet data that is received by RX
@@ -20,10 +20,10 @@ INCLUDE = include/
 BIN = bin/
 CABLE_DIR = cable/
 
-TX_SERIAL_PORT = /dev/ttyS0
-RX_SERIAL_PORT = /dev/ttyS0
+TX_SERIAL_PORT = /dev/ttyS10
+RX_SERIAL_PORT = /dev/ttyS11
 
-TX_FILE = neuron.jpg
+TX_FILE = test
 RX_FILE = neuron-received.jpg
 
 # Targets

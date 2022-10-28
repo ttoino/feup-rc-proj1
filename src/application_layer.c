@@ -109,8 +109,10 @@ ssize_t receiver(LLConnection *connection) {
                     char *first_token = strtok(tmp_file_name, ".");
                     char *second_token = strtok(NULL, ".");
 
-                    sprintf(file_name, "%s_received.%s", first_token,
-                            second_token);
+                    if (second_token != NULL)
+                        sprintf(file_name, "%s_received.%s", first_token, second_token);
+                    else
+                        sprintf(file_name, "%s_received", first_token);
 
                     packet_ptr += size;
                     break;

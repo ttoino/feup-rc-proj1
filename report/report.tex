@@ -386,6 +386,18 @@ ssize_t llwrite(
     size_t buf_len);
 \end{lstlisting}
 
+This function sends some arbitrary data to the serial port.
+
+To do this, first the function creates a new \lstinline{Frame} with an \textit{I} command, and fills its information vector with the data.
+Afterwards it sends this frame by using the \lstinline{send_frame} function.
+
+This function in turn calls \lstinline{write_frame}, which assembles the frame in a \lstinline{ByteVector} into the correct structure and byte order, after performing byte stuffing on its information.
+It then writes the bytes in this vector to the serial port.
+
+After sending the frame, a response of type \textit{RR} with the next sequence bit is expected by calling the \lstinline{expect_frame} function.
+If this function does not get a response within the set timeout, a POSIX timer that was armed in the \lstinline{send_frame} function is triggered and sends the information frame again.
+This repeats until the response arrives, after which the timer is disarmed and the amount of bytes sent is returned, or until a set maximum amount of retries is reached, after which the timer is also disarmed and -1 is returned, signaling an error.
+
 \subsection{llread}
 
 \begin{lstlisting}
@@ -393,6 +405,13 @@ ssize_t llread(
     LLConnection *connection, 
     uint8_t *buf);
 \end{lstlisting}
+
+This function reads some arbitrary data from the serial port.
+
+To do this, first the function expects to receive a command of type \textit{I} with the next sequence bit by calling \lstinline{expect_frame}, this function, which is explained in more detail above, automatically sends the correct \textit{RR} response, disassembles the received frame and destuffs its information.
+
+Afterwards the received data is copied to the provided buffer and its length is returned.
+If some part of this process is unsuccessful -1 is returned, signaling an error.
 
 \subsection{llclose}
 
@@ -402,13 +421,36 @@ int llclose(
     bool show_stats);
 \end{lstlisting}
 
+This function closes a connection to the serial port and destroys all of its state.
+
+To do this, first a syncing protocol is employed, so both layers close at roughly the same time.
+In this protocol the transmitter sends a \textit{DISC} command, then receives a \textit{DISC} command, and then sends a \textit{UA} response.
+The receiver does the same but reversed, receives a \textit{DISC} command, then sends a \textit{DISC} command, and then receives a \textit{UA} response.
+This is implemented using a combination of the functions \lstinline{send_frame} and \lstinline{expect_frame}, which are explained in more detail above.
+
+Afterwards \lstinline{connection_destroy} is called, deallocating all resources related to the connection and resetting the serial port settings to their original state.
+
 \section{Application Layer Protocol}
+
+The application layer protocol's flow is as follows:
+open a connection to the other system using the \hyperref[sec:dll]{Data Link Layer},
+open a descriptor to the file specified,
+identify the file being transmitted,
+read chunks of the file that are transmitted through the \hyperref[sec:dll]{Data Link Layer},
+signal the end of the transmission.
 
 TODO
 
 \section{Validation}
 
-TODO
+The application was tested in several circumstances:
+
+\begin{itemize}
+    \item Using different files: penguin.gif (10,968 B), neuron.jpg (31,802 B), test (9,594,624 B);
+    \item With temporary disconnects;
+    \item With interference;
+    \item Using different baud rates: 
+\end{itemize}
 
 \section{Link Layer Efficiency}
 
