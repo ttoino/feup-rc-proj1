@@ -38,40 +38,36 @@
     }
 }
 
-\title{RC - \nth{1} Project}
+\title{Computer Networks -- \nth{1} Project Report}
 \author{João Pereira, Nuno Pereira}
 
 \begin{document}
 
 \maketitle
 
-% \begin{abstract}
-%     TODO
-% \end{abstract}
-
-% \pagebreak
-
-% \tableofcontents
-
-% \pagebreak
-
 \section{Introduction}
 
-The objective of this project was to develop a simple data link layer and an application to test the effectiveness of this layer.
+The objective of this project was to send files between two computers by using the serial port.
+To do this a specified protocol was implemented, separated into two distinct and independent layers, the data link layer and the application layer.
+
+This objective was reached and resulted in an application capable of sending files between two computers with proper syncing and framing, connection establishment and termination, and error checking and handling as per the specifications.
 
 \section{Architecture}
 
 \subsection{Layers}
 
-The code was divided into two distinct layers. This has the advantage of making the code more modular, reusable and versatile, as either layer could be swapped for another with a similar interface with minimal effort.
+The code was divided into two distinct layers.
+This had the advantage of making the code more modular, reusable and versatile, as either layer could be swapped for another with a similar interface with minimal effort.
 
 \subsubsection{Data Link Layer}
 
-This is the lower level layer, it interfaces with the serial port driver directly. It is responsible for ensuring the data gets sent and received.
+This is the lower level layer, it interfaces with the serial port driver directly.
+It is responsible for opening and closing a connection, and ensuring the data gets sent and received, without errors.
 
 \subsubsection{Application Layer}
 
-This is the higher level layer, it interfaces with the data link layer and with the file system. It is responsible for reading a file, breaking it up into chunks, sending these chunks through the data link layer, receiving these chunks, and assembling them back into a file.
+This is the higher level layer, it interfaces with the data link layer and with the file system.
+It is responsible for reading a file, breaking it up into chunks, sending these chunks through the data link layer, receiving these chunks, and assembling them back into a file.
 
 \subsection{Program Execution}
 
@@ -80,8 +76,8 @@ The program can be executed by calling \lstinline{app serial_port role file_name
 \begin{itemize}
     \item \lstinline{app} is the program executable;
     \item \lstinline{serial_port} is the serial port file path;
-    \item \lstinline{role} is one of \lstinline{rx|tx}, for receiving or transmitting a file, respectively;
-    \item \lstinline{file_name} is the path of the file to be sent.
+    \item \lstinline{role} is one of \lstinline{rx} or \lstinline{tx}, for receiving or transmitting a file, respectively;
+    \item \lstinline{file_name} is the path of the file to be sent (ignored when receiving a file).
 \end{itemize}
 
 \section{Code Structure}
@@ -99,23 +95,11 @@ The \lstinline{link_layer.c} file contains the protocol interface that can be us
 typedef enum { LL_TX, LL_RX } LLRole;
     \end{lstlisting}
 
-          Defines the role of a link layer connection.
+          Defines the role of a link layer connection, either transmitter or receiver.
 
     \item \begin{lstlisting}
 typedef struct {
-    char serial_port[50];
     LLRole role;
-    int baud_rate;
-    int n_retransmissions;
-    int timeout;
-} LLConnectionParams;
-    \end{lstlisting}
-
-          Defines the parameters required to create a new link layer connection.
-
-    \item \begin{lstlisting}
-struct _LLConnection {
-    LLConnectionParams params;
     struct termios old_termios;
     int fd;
     bool closed;
@@ -124,14 +108,15 @@ struct _LLConnection {
     int n_retransmissions_sent;
     timer_t timer;
     Frame *last_command_frame;
-};
+} LLConnection;
     \end{lstlisting}
 
           Defines the state of a link layer connection.
 
     \item \begin{lstlisting}
 LLConnection *llopen(
-    LLConnectionParams params);
+    const char *serial_port,
+    LLRole role);
     \end{lstlisting}
 
           Opens a new link layer connection and returns it.
@@ -143,7 +128,7 @@ ssize_t llwrite(
     size_t buf_len);
     \end{lstlisting}
 
-          Sends data through a connection.
+          Sends data through a connection, ensuring it gets received.
 
     \item \begin{lstlisting}
 ssize_t llread(
@@ -155,8 +140,7 @@ ssize_t llread(
 
     \item \begin{lstlisting}
 int llclose(
-    LLConnection *connection, 
-    bool show_stats);
+    LLConnection *connection);
     \end{lstlisting}
 
           Closes a connection.
@@ -184,14 +168,14 @@ void timer_arm(
     LLConnection *connection);
     \end{lstlisting}
 
-          Starts a connection's POSIX timer.
+          Arms a connection's POSIX timer.
 
     \item \begin{lstlisting}
 void timer_disarm(
     LLConnection *connection);
     \end{lstlisting}
 
-          Stops a connection's POSIX timer.
+          Disarms a connection's POSIX timer.
 
     \item \begin{lstlisting}
 void timer_force(
@@ -199,6 +183,21 @@ void timer_force(
     \end{lstlisting}
 
           Forcibly calls a connection's timer handler.
+
+    \item \begin{lstlisting}
+void timer_handler(
+    union sigval val);
+    \end{lstlisting}
+
+          The connection's timer handler.
+          Resends the last command sent by the connection.
+
+    \item \begin{lstlisting}
+void signal_handler();
+    \end{lstlisting}
+
+          The connection's SIGCONT handler.
+          Does nothing, is only needed so blocking syscalls can be stopped.
 
 \end{itemize}
 
@@ -258,7 +257,26 @@ Frame *expect_frame(
     uint8_t command);
     \end{lstlisting}
 
-          Receives frames from a connection until a certain command is received.
+          Continuously receives frames from a connection until a certain command is received.
+          Calls \lstinline{handle_frame} for all received frames.
+
+    \item \begin{lstlisting}
+Frame *handle_frame(
+    LLConnection *connection, 
+    uint8_t command);
+    \end{lstlisting}
+
+          Does something in response to a frame, depending on it's type.
+
+          For \textit{SET} commands and \textit{DISC} commands from the receiver, sends a \textit{UA} frame in response.
+
+          For \textit{DISC} commands from the transmitter, sends a \textit{DISC} frame in response and expects a \textit{UA} response.
+
+          For \textit{I} commands, sends an \textit{RR} frame in response, or a \textit{REJ} frame if there was an error in the frame body.
+
+          For \textit{UA} or \textit{RR} responses, it calls \lstinline{timer_disarm}.
+
+          For \textit{REJ} responses, it calls \lstinline{timer_force}.
 
 \end{itemize}
 
@@ -272,19 +290,9 @@ The \lstinline{packet.c} file contains code that is responsible for correctly cr
 
 \begin{itemize}
     \item \begin{lstlisting}
-LLConnectionParams setupLLParams(
-    const char *serial_port, 
-    const char *role, 
-    int baud_rate, 
-    int nTries, 
-    int timeout);
-    \end{lstlisting}
-
-          Compiles the parameters given to the application layer into an \lstinline{LLConnectionParams} object to be used by the underlying \hyperref[sec:dll]{Data Link Layer}.
-
-    \item \begin{lstlisting}
 LLConnection *connect(
-    LLConnectionParams ll);
+    const char *serial_port,
+    LLRole role);
     \end{lstlisting}
 
           Opens a connection to one of the computer's serial ports.
@@ -292,7 +300,7 @@ LLConnection *connect(
     \item \begin{lstlisting}
 int init_transmission(
     LLConnection *connection, 
-    char *filename);
+    const char *filename);
     \end{lstlisting}
 
           Starts the communication process between transmitter and receiver.
@@ -313,12 +321,9 @@ ssize_t transmitter(
           Executes the transmitter's operational flow.
 
     \item \begin{lstlisting}
-void applicationLayer(
+void application_layer(
     const char *serial_port, 
-    const char *role, 
-    int baud_rate, 
-    int n_tries, 
-    int timeout, 
+    const char *role,
     const char *filename);
     \end{lstlisting}
 
@@ -335,7 +340,29 @@ ByteVector *create_start_packet(
     const char *file_name);
     \end{lstlisting}
 
-          Creates a \textbf{START} packet containing the transmitted file's size and name.
+          Creates a \textit{START} packet containing the transmitted file's size and name.
+
+    \item \begin{lstlisting}
+ByteVector *create_data_packet(
+    const uint8_t *buf
+    uint16_t size);
+    \end{lstlisting}
+
+          Creates a \textit{DATA} packet containing a chunk of the transmitted file.
+
+    \item \begin{lstlisting}
+ByteVector *create_end_packet();
+    \end{lstlisting}
+
+          Creates an \textit{END} packet.
+
+    \item \begin{lstlisting}
+ssize_t send_packet(
+    LLConnection *connection,
+    ByteVector *packet);
+    \end{lstlisting}
+
+          Sends a packet using \lstinline{llwrite}.
 
 \end{itemize}
 
@@ -433,17 +460,14 @@ Afterwards \lstinline{connection_destroy} is called, deallocating all resources 
 
 \section{Application Layer Protocol}
 
-The application layer protocol's flow is as follows:
-open a connection to the other system using the \hyperref[sec:dll]{Data Link Layer},
-open a descriptor to the file specified,
-identify the file being transmitted,
-read chunks of the file and send them through the \hyperref[sec:dll]{Data Link Layer},
-signal the end of the transmission.
+The application layer protocol's flow is as follows: open a connection to the other system using the Data Link Layer, open a descriptor to the file specified, identify the file being transmitted, read chunks of the file and send them through the Data Link Layer, signal the end of the transmission.
 
 \subsection{connect}
 
 \begin{lstlisting}
-LLConnection *connect(const char *serial_port, LLRole role)
+LLConnection *connect(
+    const char *serial_port,
+    LLRole role)
 \end{lstlisting}
 
 This function is basically a wrapper around \lstinline{llopen} that catches errors in the establishment of the connection.
@@ -451,27 +475,45 @@ This function is basically a wrapper around \lstinline{llopen} that catches erro
 \subsection{init\_transmission}
 
 \begin{lstlisting}
-int init_transmission(LLConnection *connection, const char *filename)
+int init_transmission(
+    LLConnection *connection,
+    const char *filename)
 \end{lstlisting}
 
-This functions is responsible for signaling the beginning of the file transmission process to the receiver. This also catches any errors that happened in the transmission of the \textit{START} packet.
-First we \textbf{stat} the file to be transmitted in order to get its size. Then a \textit{START} packet is constructed and sent to the receiver system. Finally we return 1 on success or -1 on failure.
+This functions is responsible for signaling the beginning of the file transmission process to the receiver.
+This also catches any errors that happened in the transmission of the \textit{START} packet.
+First we \lstinline{stat} the file to be transmitted in order to get its size. Then a \textit{START} packet is constructed and sent to the receiver system.
+Finally we return 1 on success or -1 on failure.
 
 \subsection{receiver}
 
 \begin{lstlisting}
-ssize_t receiver(LLConnection *connection)
+ssize_t receiver(
+    LLConnection *connection)
 \end{lstlisting}
 
 This function handles the \textit{receiver} logic of the application layer.
 
+It continuously receives packets using \lstinline{llread}, which are handled depending on their type.
+
+\textit{START} packets are parsed to set the relevant file properties, namely the name and size, which let us open a file descriptor to which the data will be written.
+
+\textit{DATA} packets are parsed and their sequence number is verified, if they are not received in order, a major error is assumed to have happened.
+The data in these packets is then written to the opened file descriptor.
+
+\textit{END} packets simply end the loop and lead to the opened file descriptor being closed.
+
 \subsection{transmitter}
 
 \begin{lstlisting}
-ssize_t transmitter(LLConnection *connection, const char *filename)
+ssize_t transmitter(
+    LLConnection *connection,
+    const char *filename)
 \end{lstlisting}
 
 This function handles the \textit{transmitter} logic of the application layer.
+
+Firstly, a connection is established using \lstinline{init_transmission}, then the file is read in chunks, which are sent in \textit{DATA} packets until the end of the file is reached, at which point an \textit{END} packet is sent to signal the end of the transmission. The opened file is then closed.
 
 \section{Validation}
 
@@ -492,9 +534,11 @@ The received file's integrity was verified visually and by using \lstinline{diff
 \section{Link Layer Efficiency}
 
 The data link layer efficiency was tested mainly by varying a few parameters, namely the connection capacity, the frame error ratio (simulated), the cable length (simulated), and the packet size.
-All of these tests are in \href{sec:a2}{Appendix 2}.
+All the test results are in appendix \textbf{A.2}.
 
 \subsection{Varying the Connection Capacity}
+
+\textit{The connection capacity was varied by setting the relevant baud rate flag when setting up the serial port connection.}
 
 Varying the connection capacity resulted in an almost constant efficiency function (a slightly downwards slope linear function).
 
@@ -502,21 +546,34 @@ This makes sense from a theoretical standpoint, as the efficiency is calculated 
 
 \subsection{Varying the Frame Error Ratio}
 
-Varying the frame error ratio resulted in a steep decline in efficiency as the FER increases. This can be due to the fact that in our tests, when we wanted to fall inside the "signal error" area, we outright reject an entire frame, which requires us to wait for \textit{timeout} seconds before re-transmitting the previous frame.
+\textit{The frame error ratio was varied by simulating either an error in the BCC or BCC2 fields when receiving a frame, according to the desired ratio. As stated below, this methodology proved to be problematic.}
+
+Varying the frame error ratio resulted in a steep decline in efficiency as the FER increases.
+This is due to the fact that in our error simulation, an error in the frame header is equally as likely as an error in the frame body, but an error in the header leads to a much worse penalty.
+This lead to a large amount of retransmissions, each taking \qty{4}{\second} with the timeout parameters we used, significantly reducing the efficiency.
+
+Better looking results could have been achieved by lowering the timeout parameter significantly, or by implementing a constant bit (or byte) error ratio instead, or by simulating errors in the body only, as these are much more likely for the packet size we used.
+
+As so, these results cannot be considered valid, but they do confirm how bad errors in frame headers are for the link layer efficiency when compared to errors in the frame body.
+If the methodology had been better we would have expected to see an efficiency function similar to $S = 1 - FER$, instead of the erratic function we got.
 
 \subsection{Varying the Cable Length}
 
-Varying the cable length resulted in a near-linear decrease in transmission efficiency.
+\textit{The cable length was varied by simulating a propagation time associated to this cable length. A benchmark of \qty[per-mode=symbol]{5}{\micro\second\per\kilo\metre} was used for this approximation, and the propagation time associated with the physical cable was considered negligible. This propagation time was implemented by the use of a sleep function after each frame was received.}
 
-This makes sense because the transmission speed of data packets/frames is constant throughout the cable, so the efficiency is proportional to the length.
+Varying the cable length resulted in a small efficiency decrease over short distances, but a significant decrease over large distances (an inversely proportional function).
 
-FIXME: mudar isto
+This makes sense from a theoretical standpoint, as the efficiency follows the function $S = \frac{1}{1 - 2a}$ where $a = \frac{t_{prop}}{t_f}$, and $t_f$ is constant, while $t_{prop}$ increases linearly with the cable length.
 
 \subsection{Varying the Packet Size}
 
-Varying the packet size resulted in a functions that is close to \textit{(-1/x) + 1}, showing that the optimal packet size is between 1024 and 2048: any values bigger do not incur any performance gain.
+\textit{The packet size was varied directly.}
 
-FIXME: mudar isto
+Varying the packet size resulted in a significant increase in efficiency up to a certain size, when diminishing returns were reached.
+This makes sense, as the time spent assembling/verifying headers decreases as the overall frame size increases and the amount of frames decreases.
+
+It is worth noting that the error ratio in these tests was zero, so there was no downside in increasing the frame size.
+In the real world there would be a higher amount of errors in larger frames, assuming a constant bit error ratio, so there would be a "sweet spot" where the error ratio cancels out the efficiency gains from increasing the frame size.
 
 \section{Conclusions}
 
@@ -705,7 +762,7 @@ TODO
     \caption{Efficiency for a varied packet size}
 \end{table}
 
-\pgfkeys{/pgf/number format/.cd,fixed,precision=0}
+\pgfkeys{/pgf/number format/.cd,fixed,precision=1}
 \begin{center}
     \begin{tikzpicture}
         \begin{axis}[

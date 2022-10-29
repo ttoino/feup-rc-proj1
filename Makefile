@@ -23,7 +23,7 @@ CABLE_DIR = cable/
 TX_SERIAL_PORT = /dev/ttyS10
 RX_SERIAL_PORT = /dev/ttyS11
 
-TX_FILE = test
+TX_FILE = neuron.jpg
 RX_FILE = neuron-received.jpg
 
 # Targets

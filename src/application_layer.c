@@ -71,12 +71,14 @@ ssize_t receiver(LLConnection *connection) {
             break;
         }
 
-        INFO("Received packet");
 #ifdef _PRINT_PACKET_DATA
+        INFO("Received packet");
         printf(":");
         for (size_t i = 0; i < bytes_read; ++i)
             printf(" %02x", packet[i]);
         printf("\n");
+#else
+        INFO("Received packet\n");
 #endif
 
         packet_ptr = packet;
@@ -110,7 +112,8 @@ ssize_t receiver(LLConnection *connection) {
                     char *second_token = strtok(NULL, ".");
 
                     if (second_token != NULL)
-                        sprintf(file_name, "%s_received.%s", first_token, second_token);
+                        sprintf(file_name, "%s_received.%s", first_token,
+                                second_token);
                     else
                         sprintf(file_name, "%s_received", first_token);
 
@@ -134,15 +137,17 @@ ssize_t receiver(LLConnection *connection) {
 
         } else if (packet_type == DATA_PACKET) {
 
-	    static uint8_t acc_sequence_number = 0;
+            static uint8_t acc_sequence_number = 0;
             uint8_t rcv_sequence_number = *packet_ptr++;
-            
-	    if (acc_sequence_number++ != rcv_sequence_number) {
-		ERROR("Critical: Received incorrect packet (expected=%d, actual=%d), aborting!\n", acc_sequence_number, rcv_sequence_number);
-		return -1;
-	    }
 
-	    uint8_t fragment_size_h = *packet_ptr++;
+            if (acc_sequence_number++ != rcv_sequence_number) {
+                ERROR("Critical: Received incorrect packet (expected=%d, "
+                      "actual=%d), aborting!\n",
+                      acc_sequence_number, rcv_sequence_number);
+                return -1;
+            }
+
+            uint8_t fragment_size_h = *packet_ptr++;
             uint8_t fragment_size_l = *packet_ptr++;
 
             uint16_t fragment_size = (fragment_size_h << 8) | fragment_size_l;
@@ -209,7 +214,7 @@ ssize_t transmitter(LLConnection *connection, const char *filename) {
 
     close(fd);
 
-   return 1;
+    return 1;
 }
 
 void application_layer(const char *serial_port, const char *role,

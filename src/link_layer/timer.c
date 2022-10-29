@@ -20,7 +20,7 @@ void timer_handler(union sigval val) {
     connection->n_retransmissions_sent++;
 }
 
-void a() {
+void signal_handler() {
     ERROR("Max retries achieved, endpoints are probably disconnected, closing "
           "connection!\n");
 }
@@ -32,11 +32,11 @@ int timer_setup(LLConnection *connection) {
 
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
-    sa.sa_handler = a;
+    sa.sa_handler = signal_handler;
     sa.sa_flags = 0;
     sigaction(SIGCONT, &sa, NULL);
 
-    return timer_create(CLOCK_REALTIME, &event, &connection->timer);
+    return timer_create(CLOCK_MONOTONIC, &event, &connection->timer);
 }
 
 int timer_destroy(LLConnection *connection) {
