@@ -18,6 +18,15 @@
 #include "application_layer.h"
 #include "application_layer/packet.h"
 
+/**
+ * @brief Opens a connection to the receiver through the given serial port.
+ * 
+ * @param serial_port the serial port to connect to in this instance of the application
+ * @param role the role of this application instance
+ * 
+ * @return LLConnection* a pointer to the connection object created
+ * @return NULL on failure
+ */
 LLConnection *connect(const char *serial_port, LLRole role) {
     LOG("Connecting to %s\n", serial_port);
 
@@ -36,6 +45,15 @@ LLConnection *connect(const char *serial_port, LLRole role) {
     return connection;
 }
 
+/**
+ * @brief Starts the transmission process.
+ * 
+ * @param connection the connection through which the transmission is being done
+ * @param filename the name of the file to transmit
+ * 
+ * @return 1 on success
+ * @return -1 on failure
+ */
 int init_transmission(LLConnection *connection, const char *filename) {
     struct stat st;
 
@@ -56,6 +74,13 @@ int init_transmission(LLConnection *connection, const char *filename) {
     return 1;
 }
 
+/**
+ * @brief Performs the receiver routine for this application instance.
+ * 
+ * @param connection the connection to use to receive data from.
+ * 
+ * @return ssize_t always returns 1
+ */
 ssize_t receiver(LLConnection *connection) {
     uint8_t *packet_ptr = NULL;
     int fd = -1;
@@ -175,6 +200,14 @@ ssize_t receiver(LLConnection *connection) {
     return 1;
 }
 
+/**
+ * @brief Performs the transmitter routine for this application instance.
+ * 
+ * @param connection the connection to use to send data to.
+ * @param filename the name of the file to send
+ * 
+ * @return ssize_t always returns 1
+ */
 ssize_t transmitter(LLConnection *connection, const char *filename) {
     int fd = open(filename, O_RDWR | O_NOCTTY);
 
