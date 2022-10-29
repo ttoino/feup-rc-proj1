@@ -371,13 +371,37 @@ ssize_t send_packet(
 There are two main use cases: either sending a file or receiving a file.
 These use cases are described below.
 
+\subsection{Common behavior}
+
+For both cases described bellow, a \lstinline{LLConnection} object is created by calling the \lstinline{connect} function on the Application Layer. This function just calls \lstinline{llopen} with the correct role and catches any errors.
+
+In the end, both \textit{receiver} and \textit{transmitter} call \lstinline{llclose} to end the communication process and print the execution time to the console.
+
 \subsection{Sending a file}
 
-TODO
+When sending a file, the application layer first tries to open a descriptor to the specified file and initiates the transmission process by calling the \lstinline{init_transmission}: this function sends a control packet to the receiver in order to broadcast that it's ready to send data through the underlying Data Link Layer.
+
+Then, chunks of \lstinline{PACKET_DATA_SIZE} bytes are read from the previously opened file descriptor and the actual number of bytes is returned. If it is:
+\begin{itemize}
+    \item -1: An error has occurred while reading the file, break out of the transmitter loop and close both the file descriptor and serial connection.
+    
+    \item 0: The end of the file has been reached, so the application layer sends an \textit{END} control packet to the receiver to signal the correct end of transmission.
+
+    \item another value: The read operation was successful and the data is stored in a buffer, using it to send a \textit{DATA} packet.
+\end{itemize}
 
 \subsection{Receiving a file}
 
-TODO
+When receiving a file, the application layer reads a packet and stores the number of bytes read. Then the packet is processed, starting with the packet type. If it is:
+\begin{itemize}
+    \item \textit{START\_PACKET}: the packet is further deconstructed in order to collect the transmitted file's size and name. Then, a file descriptor is opened to the provided file.
+    
+    \item \textit{DATA\_PACKET}: the packet is deconstructed, first retrieving the packet's sequence number: if it does not match the expected sequence number then the program aborts since a critical failure has happened at the Data Link Layer. 
+    
+    If the sequence number matches the expected one then the fragment size is retrieved in order to write to the file the data fragment received, which corresponds to the rest of the packet.
+    
+    \item \textit{END\_PACKET}: the application layer breaks out of the receiver loop in order to close connections and perform cleanup.
+\end{itemize}
 
 \section{Link Layer Protocol}
 
@@ -460,7 +484,7 @@ Afterwards \lstinline{connection_destroy} is called, deallocating all resources 
 
 \section{Application Layer Protocol}
 
-The application layer protocol's flow is as follows: open a connection to the other system using the Data Link Layer, open a descriptor to the file specified, identify the file being transmitted, read chunks of the file and send them through the Data Link Layer, signal the end of the transmission.
+The application layer protocol's flow is as follows: open a connection to the other system, transmit the specified file and close the connection. It does so using the interfaces provided by the underlying Data Link Layer.
 
 \subsection{connect}
 
@@ -563,7 +587,7 @@ If the methodology had been better we would have expected to see an efficiency f
 
 Varying the cable length resulted in a small efficiency decrease over short distances, but a significant decrease over large distances (an inversely proportional function).
 
-This makes sense from a theoretical standpoint, as the efficiency follows the function $S = \frac{1}{1 - 2a}$ where $a = \frac{t_{prop}}{t_f}$, and $t_f$ is constant, while $t_{prop}$ increases linearly with the cable length.
+This makes sense from a theoretical standpoint, as the efficiency follows the function $S = \frac{1}{1 - 2a}$ where $a = \frac{t_{prop}}{t_f}$ and $t_f$ is constant, while $t_{prop}$ increases linearly with the cable length.
 
 \subsection{Varying the Packet Size}
 
@@ -577,7 +601,9 @@ In the real world there would be a higher amount of errors in larger frames, ass
 
 \section{Conclusions}
 
-TODO
+To sum up, the goal of the project was achieved without much trouble. In addition, it helped us better understand the contents lectured in the theoretical lessons.
+
+The protocol was developed in compliance with the given specification and the code is well structured, making it more robust and resistent to changes in the future.
 
 \onecolumn
 \appendix

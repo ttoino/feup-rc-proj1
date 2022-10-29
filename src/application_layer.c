@@ -132,7 +132,7 @@ ssize_t receiver(LLConnection *connection) {
 
             if (fd == -1) {
                 ERROR("Opening RX fd: %s\n", strerror(errno));
-                exit(-1);
+                break;
             }
 
         } else if (packet_type == DATA_PACKET) {
@@ -144,7 +144,7 @@ ssize_t receiver(LLConnection *connection) {
                 ERROR("Critical: Received incorrect packet (expected=%d, "
                       "actual=%d), aborting!\n",
                       acc_sequence_number, rcv_sequence_number);
-                return -1;
+                break;
             }
 
             uint8_t fragment_size_h = *packet_ptr++;
@@ -159,7 +159,7 @@ ssize_t receiver(LLConnection *connection) {
 
             if (bytes_written == -1) {
                 ERROR("Writing to RX fd: %s\n", strerror(errno));
-                exit(-1);
+                break;
             } else if (bytes_written != 0) {
                 total_bytes_written += bytes_written;
 
