@@ -71,6 +71,13 @@ Frame *create_frame(LLConnection *connection, uint8_t cmd) {
     return frame;
 }
 
+/**
+ * @brief Constructs the BCC byte for a given frame.
+ *
+ * @param frame The frame.
+ *
+ * @return The BCC byte.
+ */
 uint8_t make_bcc(Frame *frame) {
     return (uint8_t)(frame->address ^ frame->command);
 }
@@ -93,6 +100,9 @@ bool check_command_and_address(Frame *frame, LLRole role) {
              (role == LL_TX && frame->address == TX_ADDR)));
 }
 
+/**
+ * @return A pseudo-random number between 0 and 1.
+ */
 double rand_double() { return (double)rand() / (double)RAND_MAX; }
 
 Frame *read_frame(LLConnection *connection) {
@@ -331,6 +341,24 @@ ssize_t send_frame(LLConnection *connection, Frame *frame) {
     return bytes_written;
 }
 
+/**
+ * @brief Handles a received frame.
+ *
+ * Does something different when each type of frame is received:
+ * - #SET: Sends a #UA in response;
+ * - #DISC:
+ *   - Transmitter: Sends a #UA in response;
+ *   - Receiver: Sends another #DISC in response, and expects a #UA;
+ * - #I: Sends an #RR in response;
+ * - #UA or #RR: Disarms the retransmission timer;
+ * - #REJ: Calls #timer_force;
+ * - #I_ERR: Sends a #REJ in response.
+ *
+ * @param connection The connection the frame was received in.
+ * @param frame The frame
+ *
+ * @return -1 on error.
+ */
 ssize_t handle_frame(LLConnection *connection, Frame *frame) {
     LOG("Received frame (c = %s, 0x%02x)\n", get_command(frame->command),
         frame->command);

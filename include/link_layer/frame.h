@@ -169,6 +169,7 @@ void frame_destroy(Frame *this);
  *       commands.
  *
  * @param connection The connection to send through.
+ * @param frame The frame to be sent.
  *
  * @return The number of bytes written.
  * @return -1 on error.

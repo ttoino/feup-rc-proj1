@@ -4,6 +4,13 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+/**
+ * @brief Retransmits the last command frame that a connection sent.
+ *
+ * Gets called when a retransmission timer fires.
+ *
+ * @param val The connection this was called in.
+ */
 void timer_handler(union sigval val) {
     LLConnection *connection = val.sival_ptr;
 
@@ -20,6 +27,11 @@ void timer_handler(union sigval val) {
     connection->n_retransmissions_sent++;
 }
 
+/**
+ * @brief Handles a signal.
+ *
+ * Only needed so blocking syscalls can be canceled.
+ */
 void signal_handler() {
     ERROR("Max retries achieved, endpoints are probably disconnected, closing "
           "connection!\n");

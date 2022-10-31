@@ -22,6 +22,13 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
+/**
+ * @brief Performs the handshake procedure.
+ *
+ * @param this The connection.
+ *
+ * @return -1 on failure.
+ */
 int handshake(LLConnection *this) {
     if (this->role == LL_TX) {
         if (send_frame(this, create_frame(this, SET)) == -1)
@@ -38,6 +45,14 @@ int handshake(LLConnection *this) {
     return 0;
 }
 
+/**
+ * @brief Sets the up serial port.
+ *
+ * @param this The connection.
+ * @param serial_port The serial port path.
+ *
+ * @return -1 on failure.
+ */
 int setup_serial(LLConnection *this, const char *serial_port) {
     LOG("Setting up serial port connection...\n");
 
@@ -80,6 +95,11 @@ int setup_serial(LLConnection *this, const char *serial_port) {
     return 1;
 }
 
+/**
+ * @brief Deallocates all objects related to a connection.
+ *
+ * @param this The connection.
+ */
 void connection_destroy(LLConnection *this) {
     frame_destroy(this->last_command_frame);
     tcsetattr(this->fd, TCSANOW, &this->old_termios);
@@ -88,9 +108,6 @@ void connection_destroy(LLConnection *this) {
     free(this);
 }
 
-////////////////////////////////////////////////
-// LLOPEN
-////////////////////////////////////////////////
 LLConnection *llopen(const char *serial_port, LLRole role) {
     LLConnection *this = malloc(sizeof(LLConnection));
     this->last_command_frame = NULL;
@@ -115,9 +132,6 @@ LLConnection *llopen(const char *serial_port, LLRole role) {
     return this;
 }
 
-////////////////////////////////////////////////
-// LLWRITE
-////////////////////////////////////////////////
 ssize_t llwrite(LLConnection *this, const uint8_t *buf, size_t bufSize) {
     if (this->closed)
         return -1;
@@ -151,9 +165,6 @@ ssize_t llwrite(LLConnection *this, const uint8_t *buf, size_t bufSize) {
     return bytes_written;
 }
 
-////////////////////////////////////////////////
-// LLREAD
-////////////////////////////////////////////////
 ssize_t llread(LLConnection *this, uint8_t *packet) {
     if (this->closed)
         return -1;
@@ -180,9 +191,6 @@ ssize_t llread(LLConnection *this, uint8_t *packet) {
     return bytes_read;
 }
 
-////////////////////////////////////////////////
-// LLCLOSE
-////////////////////////////////////////////////
 int llclose(LLConnection *this) {
     if (!this->closed) {
         if (this->role == LL_TX) {

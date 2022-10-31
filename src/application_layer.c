@@ -20,12 +20,12 @@
 
 /**
  * @brief Opens a connection to the receiver through the given serial port.
- * 
- * @param serial_port the serial port to connect to in this instance of the application
- * @param role the role of this application instance
- * 
- * @return LLConnection* a pointer to the connection object created
- * @return NULL on failure
+ *
+ * @param serial_port The serial port to connect to.
+ * @param role The role of this application instance.
+ *
+ * @return A pointer to the connection object created.
+ * @return NULL on failure.
  */
 LLConnection *connect(const char *serial_port, LLRole role) {
     LOG("Connecting to %s\n", serial_port);
@@ -47,12 +47,13 @@ LLConnection *connect(const char *serial_port, LLRole role) {
 
 /**
  * @brief Starts the transmission process.
- * 
- * @param connection the connection through which the transmission is being done
- * @param filename the name of the file to transmit
- * 
- * @return 1 on success
- * @return -1 on failure
+ *
+ * @param connection The connection through which the transmission is being
+ *                   done.
+ * @param filename The name of the file to transmit.
+ *
+ * @return 1 on success.
+ * @return -1 on failure.
  */
 int init_transmission(LLConnection *connection, const char *filename) {
     struct stat st;
@@ -76,10 +77,10 @@ int init_transmission(LLConnection *connection, const char *filename) {
 
 /**
  * @brief Performs the receiver routine for this application instance.
- * 
- * @param connection the connection to use to receive data from.
- * 
- * @return ssize_t always returns 1
+ *
+ * @param connection The connection to use to receive data from.
+ *
+ * @return 1.
  */
 ssize_t receiver(LLConnection *connection) {
     uint8_t *packet_ptr = NULL;
@@ -202,11 +203,11 @@ ssize_t receiver(LLConnection *connection) {
 
 /**
  * @brief Performs the transmitter routine for this application instance.
- * 
- * @param connection the connection to use to send data to.
- * @param filename the name of the file to send
- * 
- * @return ssize_t always returns 1
+ *
+ * @param connection The connection to use to send data to.
+ * @param filename The name of the file to send.
+ *
+ * @return 1.
  */
 ssize_t transmitter(LLConnection *connection, const char *filename) {
     int fd = open(filename, O_RDWR | O_NOCTTY);
