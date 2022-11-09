@@ -1,17 +1,20 @@
 # -*- Makefile -*-
-# Makefile to build the project
-# NOTE: This file must not be changed.
 
 # Parameters
 CC = gcc
 
-C = 57600
 DEBUG_LEVEL=3
+# Connection capacity, aka baudrate
+C = 57600
+# Frame error ratio
 FER = 0
+# Propagation time
 T_PROP = 0
+# Data packet data size
 PACKET_SIZE = 4096
 
-# _DEBUG is used to include internal logging of errors and general information. Levels go from 1 to 3, highest to lowest priority respectively
+# _DEBUG is used to include internal logging of errors and general information.
+# Levels go from 1 to 3, highest to lowest priority respectively
 # _PRINT_PACKET_DATA is used to print the packet data that is received by RX
 CFLAGS = -Wall -g -D _DEBUG=$(DEBUG_LEVEL) -D C=$(C) -D FER=$(FER) -D T_PROP=$(T_PROP) -D PACKET_DATA_SIZE=$(PACKET_SIZE)
 
@@ -20,10 +23,14 @@ INCLUDE = include/
 BIN = bin/
 CABLE_DIR = cable/
 
+# The serial port for the transmitter
 TX_SERIAL_PORT = /dev/ttyS10
+# The serial port for the receiver
 RX_SERIAL_PORT = /dev/ttyS11
 
+# The file to be transmitted
 TX_FILE = neuron.jpg
+# Does nothing
 RX_FILE = neuron-received.jpg
 
 # Targets
